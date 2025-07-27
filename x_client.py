@@ -1,8 +1,9 @@
 import tweepy
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any, Optional
 from loguru import logger
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timezone, timedelta
 
 
 class XClient:
@@ -29,6 +30,21 @@ class XClient:
         
         logger.info("X API client initialized successfully")
     
+    def test_api_permissions(self) -> bool:
+        """Test if the API credentials have the necessary permissions"""
+        try:
+            # Test basic read access
+            me = self.client.get_me()
+            if me.data:
+                logger.info(f"Authenticated as: @{me.data.username} ({me.data.name})")
+                return True
+            else:
+                logger.error("Could not retrieve authenticated user info")
+                return False
+        except Exception as e:
+            logger.error(f"Error testing API permissions: {str(e)}")
+            return False
+    
     def get_user_recent_tweets(self, username: str, count: int = 10) -> List[Dict[str, Any]]:
         """Get recent tweets from a specific user"""
         try:
@@ -40,10 +56,13 @@ class XClient:
             
             user_id = user.data.id
             
+            # Ensure count is within API limits (5-100)
+            api_count = max(5, min(count, 100))
+            
             # Get recent tweets
             tweets = self.client.get_users_tweets(
                 id=user_id,
-                max_results=count,
+                max_results=api_count,
                 tweet_fields=['created_at', 'public_metrics', 'context_annotations', 'conversation_id']
             )
             

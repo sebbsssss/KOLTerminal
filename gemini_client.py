@@ -14,6 +14,11 @@ class GeminiClient:
         
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        # Track recent conversation starters to avoid repetition
+        self.recent_starters = []
+        self.max_recent_starters = 10
+        
         logger.info("Gemini AI client initialized successfully")
     
     def generate_reply(self, tweet_data: Dict[str, Any], account_config: AccountConfig) -> Optional[str]:
@@ -33,11 +38,9 @@ class GeminiClient:
                 if len(reply) > account_config.max_reply_length:
                     reply = reply[:account_config.max_reply_length - 3] + "..."
                 
-                # Add preferred hashtags if they fit
-                if account_config.preferred_hashtags:
-                    hashtag = random.choice(account_config.preferred_hashtags)
-                    if len(reply) + len(hashtag) + 1 <= account_config.max_reply_length:
-                        reply += f" {hashtag}"
+                # Remove any hashtags that might have been generated
+                import re
+                reply = re.sub(r'#\w+', '', reply).strip()
                 
                 logger.success(f"Generated reply: {reply}")
                 return reply
@@ -101,8 +104,17 @@ Important rules:
 5. Focus on adding value to the conversation
 6. Don't repeat what they already said
 7. Make sure your reply stands alone and makes sense
+8. NEVER use hashtags (#) - absolutely no hashtags allowed
+9. Do not include any # symbols in your response
+10. VARY your conversation starters - avoid repetitive patterns like always starting with "Interesting!"
+11. Use diverse openings: direct questions, observations, agreements, building on points, sharing experiences, STATEMENTS
+12. DON'T make every reply a question - mix in confident statements, observations, and insights
+13. Add subtle web3/crypto style when appropriate ("gm", "wagmi", "based", "this is the way") but keep it professional
+14. Sound human and spontaneous, not formulaic or robotic
+15. Match the energy and style of the original tweet
+16. Be authentic - sometimes be brief, sometimes elaborate, sometimes curious, sometimes supportive
 
-Generate a single reply (no quotes, no extra text):"""
+Generate a single reply (no quotes, no extra text, no hashtags):"""
         
         return prompt
     
