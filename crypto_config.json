@@ -1,0 +1,108 @@
+{
+  "monitored_accounts": {
+    "cobie": {
+      "username": "cobie",
+      "tonality": "analytical",
+      "content_types": ["insight", "agreement", "constructive_criticism"],
+      "max_reply_length": 280,
+      "reply_probability": 0.7,
+      "custom_instructions": "Focus on DeFi, trading insights, and market analysis. Use crypto terminology naturally. Provide thoughtful technical analysis on memecoin trends and micro finance innovations.",
+      "avoid_keywords": ["scam", "rug", "lawsuit"],
+      "preferred_hashtags": []
+    },
+    "punk6529": {
+      "username": "punk6529",
+      "tonality": "professional",
+      "content_types": ["insight", "question", "resource_sharing"],
+      "max_reply_length": 280,
+      "reply_probability": 0.6,
+      "custom_instructions": "Engage with NFT, web3, and decentralization topics. Share technical insights about blockchain technology and its implications for memecoin ecosystems.",
+      "avoid_keywords": ["politics", "regulation"],
+      "preferred_hashtags": []
+    },
+    "gmoneyNFT": {
+      "username": "gmoneyNFT",
+      "tonality": "casual",
+      "content_types": ["agreement", "appreciation", "insight"],
+      "max_reply_length": 280,
+      "reply_probability": 0.8,
+      "custom_instructions": "Focus on NFTs, web3 culture, and memecoin trends. Use crypto slang appropriately (gm, wagmi, based, lfg). Provide analysis on trending micro finance movements.",
+      "avoid_keywords": ["fud", "dump"],
+      "preferred_hashtags": []
+    },
+    "DegenSpartan": {
+      "username": "DegenSpartan",
+      "tonality": "enthusiastic",
+      "content_types": ["insight", "agreement", "question"],
+      "max_reply_length": 280,
+      "reply_probability": 0.75,
+      "custom_instructions": "Engage with DeFi yield farming, altcoin analysis, and memecoin alpha. Provide technical analysis on trending micro finance protocols and memecoin tokenomics.",
+      "avoid_keywords": ["bear market", "crash"],
+      "preferred_hashtags": []
+    },
+    "loomdart": {
+      "username": "loomdart",
+      "tonality": "analytical",
+      "content_types": ["insight", "constructive_criticism", "resource_sharing"],
+      "max_reply_length": 280,
+      "reply_probability": 0.6,
+      "custom_instructions": "Focus on on-chain analysis, DeFi protocols, and memecoin metrics. Provide data-driven insights on trending micro finance innovations and tokenomics.",
+      "avoid_keywords": ["moonboy", "hopium"],
+      "preferred_hashtags": []
+    },
+    "rektcapital": {
+      "username": "rektcapital",
+      "tonality": "professional",
+      "content_types": ["insight", "agreement", "question"],
+      "max_reply_length": 280,
+      "reply_probability": 0.7,
+      "custom_instructions": "Engage with technical analysis, chart patterns, and market structure. Provide TA insights on BTC, ETH, and trending memecoins. Focus on micro finance trend analysis.",
+      "avoid_keywords": ["financial advice", "not financial advice"],
+      "preferred_hashtags": []
+    },
+    "DeFianceCapital": {
+      "username": "DeFianceCapital",
+      "tonality": "professional",
+      "content_types": ["insight", "resource_sharing", "constructive_criticism"],
+      "max_reply_length": 280,
+      "reply_probability": 0.5,
+      "custom_instructions": "Focus on venture capital perspectives, DeFi innovations, and emerging protocols. Provide institutional-level analysis on memecoin trends and micro finance developments.",
+      "avoid_keywords": ["retail", "apes"],
+      "preferred_hashtags": []
+    },
+    "ZachXBT": {
+      "username": "ZachXBT",
+      "tonality": "analytical",
+      "content_types": ["appreciation", "insight", "question"],
+      "max_reply_length": 280,
+      "reply_probability": 0.4,
+      "custom_instructions": "Engage with on-chain investigations, security topics, and protocol analysis. Provide technical insights while maintaining focus on legitimate memecoin trends.",
+      "avoid_keywords": ["investigation", "fraud"],
+      "preferred_hashtags": []
+    },
+    "mileydyson": {
+      "username": "mileydyson",
+      "tonality": "casual",
+      "content_types": ["agreement", "insight", "appreciation"],
+      "max_reply_length": 280,
+      "reply_probability": 0.8,
+      "custom_instructions": "Focus on memecoin culture, web3 trends, and crypto Twitter dynamics. Provide analysis on trending memecoin narratives and micro finance innovations in the space.",
+      "avoid_keywords": ["normie", "ngmi"],
+      "preferred_hashtags": []
+    },
+    "CryptoCobain": {
+      "username": "CryptoCobain",
+      "tonality": "humorous",
+      "content_types": ["agreement", "appreciation", "insight"],
+      "max_reply_length": 280,
+      "reply_probability": 0.9,
+      "custom_instructions": "Engage with memecoin alpha, degen culture, and trending narratives. Use appropriate crypto humor and slang. Provide technical analysis wrapped in accessible, entertaining language.",
+      "avoid_keywords": ["serious", "institutional"],
+      "preferred_hashtags": []
+    }
+  },
+  "check_interval_minutes": 10,
+  "dry_run": false,
+  "max_replies_per_hour": 15,
+  "bot_username": "your_crypto_bot_username"
+}

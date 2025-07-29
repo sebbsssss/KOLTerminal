@@ -151,3 +151,23 @@ class XClient:
         except Exception as e:
             logger.error(f"Error checking if already replied to {tweet_id}: {str(e)}")
             return True  # Assume already replied to be safe
+    
+    def post_tweet(self, tweet_text: str, dry_run: bool = True) -> bool:
+        """Post an original tweet"""
+        try:
+            if dry_run:
+                logger.info(f"[DRY RUN] Would post tweet: {tweet_text}")
+                return True
+            
+            response = self.client.create_tweet(text=tweet_text)
+            
+            if response.data:
+                logger.success(f"Successfully posted tweet: {tweet_text}")
+                return True
+            else:
+                logger.error(f"Failed to post tweet: {tweet_text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error posting tweet: {str(e)}")
+            return False
