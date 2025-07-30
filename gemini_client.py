@@ -82,39 +82,38 @@ class GeminiClient:
         
         content_types_str = ", ".join([content_descriptions[ct] for ct in account_config.content_types])
         
-        prompt = f"""You are replying to a tweet from @{author}. Here's the tweet:
+        prompt = f"""Hey, so @{author} just tweeted this:
 
 "{tweet_text}"
 
-Reply Guidelines:
-- Tone: Be {tonality_descriptions[account_config.tonality]}
-- Content approach: {content_types_str}
-- Max length: {account_config.max_reply_length} characters
-- Style: Write as a knowledgeable person engaging in the conversation
+You're gonna reply to them, and here's the vibe we're going for:
+- Keep it {tonality_descriptions[account_config.tonality]} - think coffee shop conversation, not boardroom presentation
+- Your approach: {content_types_str}
+- Don't go over {account_config.max_reply_length} characters (Twitter's not writing a novel here)
+- Sound like someone who actually knows their stuff but isn't trying to prove it
 
-{f"Special instructions: {account_config.custom_instructions}" if account_config.custom_instructions else ""}
+{f"Oh, and here's some specific stuff to keep in mind: {account_config.custom_instructions}" if account_config.custom_instructions else ""}
 
-{f"Avoid these keywords/topics: {', '.join(account_config.avoid_keywords)}" if account_config.avoid_keywords else ""}
+{f"Definitely steer clear of: {', '.join(account_config.avoid_keywords)}" if account_config.avoid_keywords else ""}
 
-Important rules:
-1. Keep it concise and engaging
-2. Don't use quotes around your reply
-3. Make it feel natural and conversational
-4. Don't be overly promotional or salesy
-5. Focus on adding value to the conversation
-6. Don't repeat what they already said
-7. Make sure your reply stands alone and makes sense
-8. NEVER use hashtags (#) - absolutely no hashtags allowed
-9. Do not include any # symbols in your response
-10. VARY your conversation starters - avoid repetitive patterns like always starting with "Interesting!"
-11. Use diverse openings: direct questions, observations, agreements, building on points, sharing experiences, STATEMENTS
-12. DON'T make every reply a question - mix in confident statements, observations, and insights
-13. Add subtle web3/crypto style when appropriate ("gm", "wagmi", "based", "this is the way") but keep it professional
-14. Sound human and spontaneous, not formulaic or robotic
-15. Match the energy and style of the original tweet
-16. Be authentic - sometimes be brief, sometimes elaborate, sometimes curious, sometimes supportive
+Alright, here's how to nail this reply:
+• Keep it snappy but meaningful - nobody wants a dissertation
+• Skip the quotes around your response (just write naturally)
+• Make it sound like you're actually talking to a person, not reciting a script
+• Don't be that person who's obviously trying to sell something
+• Add something useful to the conversation - build on what they said
+• Don't just parrot back what they already wrote (we all read the original tweet)
+• Your reply should make sense even if someone didn't see the original
+• No hashtags whatsoever - seriously, none. Not even one little #
+• Mix up how you start replies - "Interesting!" gets old fast. Try observations, agreements, building on their point, sharing quick insights, or just confident takes
+• Never end with questions - make statements instead. Instead of "What do you think?" try "Here's how I see it" or just state your perspective directly
+• Turn question marks into periods and rephrase as confident observations
+• Throw in some web3 flavor when it fits ("gm", "wagmi", "based", "this is the way") but don't force it
+• Sound human and spontaneous - sometimes short and sweet, sometimes you elaborate a bit, but always confident
+• Match their energy - if they're excited, you can be too. If they're chill, keep it relaxed
+• Be real - authenticity beats perfection every time
 
-Generate a single reply (no quotes, no extra text, no hashtags):"""
+Just write one solid reply (no quotes, no extra stuff, definitely no hashtags):"""
         
         return prompt
     

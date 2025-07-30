@@ -62,22 +62,25 @@ class CryptoContentGenerator:
         """Generate technical analysis focused on memecoin trends"""
         top_tokens = trending_tokens[:3]
         
-        prompt = f"""Create a technical analysis thread starter (single tweet, max 280 chars) about the current memecoin market trends. 
+        prompt = f"""Alright, time to drop some memecoin analysis. Here's what's trending right now:
 
-Current trending memecoins:
 {chr(10).join([f"- {token.symbol} ({token.name}): +{token.price_change_24h}% (24h), Volume: ${token.volume_24h:,.0f}, Social: {token.social_mentions} mentions" for token in top_tokens])}
 
-Requirements:
-- Focus on technical patterns, not financial advice
-- Mention specific tokens but analyze broader trends
-- Use professional crypto terminology
-- Include micro finance angle (how memecoins are becoming micro investment vehicles)
-- Be analytical but accessible
-- No hashtags, no quotes around response
-- Sound like an experienced trader sharing insights
-- Keep it concise and engaging
+You need to write one solid tweet (max 280 chars) about these trends. Here's the vibe:
 
-Write a single tweet that provides valuable technical analysis on the memecoin space:"""
+• Focus on the technical patterns - we're not giving financial advice, just calling what we see
+• Mention specific tokens but talk about the bigger picture trends
+• Use proper crypto terminology but don't sound like a textbook
+• Weave in the micro finance angle - how these memecoins are becoming micro investment vehicles for regular people
+• Keep it analytical but make sure normal humans can understand it
+• No hashtags at all, and don't put quotes around your response
+• Sound like someone who's been trading for years and actually knows what they're talking about
+• Keep it tight and engaging - Twitter attention spans are short
+• Never ask questions - just state your observations and analysis confidently
+• If you catch yourself about to ask something, flip it into a confident statement instead
+• Use periods, not question marks
+
+Just write one tweet that gives people real value about the memecoin space:"""
 
         try:
             response = self.model.generate_content(prompt)
@@ -92,25 +95,28 @@ Write a single tweet that provides valuable technical analysis on the memecoin s
     
     def generate_defi_microfinance_analysis(self) -> str:
         """Generate analysis on DeFi micro finance trends"""
-        prompt = """Create a technical analysis tweet (max 280 chars) about emerging micro finance trends in DeFi and web3.
+        prompt = """Time to talk about what's happening in DeFi micro finance. Write one tweet (max 280 chars) about the emerging trends that are actually worth paying attention to.
 
-Focus areas:
-- Micro lending protocols
-- Small-cap token yield farming opportunities  
-- Fractional NFT finance
-- Cross-chain micro transactions
-- Decentralized peer-to-peer lending
-- Micro investment DAOs
+What's hot right now:
+• Micro lending protocols getting real traction
+• Small-cap token yield farming opportunities that aren't complete degens
+• Fractional NFT finance (finally making sense)
+• Cross-chain micro transactions becoming viable
+• Decentralized peer-to-peer lending that works
+• Micro investment DAOs for regular people
 
-Requirements:
-- Technical but accessible language
-- Mention specific trends without financial advice
-- Professional crypto trader perspective
-- No hashtags, no quotes
-- Focus on innovation and technical developments
-- Highlight opportunities in the micro finance space
+Here's the approach:
+• Keep it technical but don't lose normal people
+• Call out specific trends but we're not giving financial advice
+• Sound like a trader who's been around the block
+• Skip the hashtags and don't quote your response
+• Focus on the innovation and what's actually working
+• Highlight real opportunities in micro finance
+• Never ask questions - just state what you're seeing confidently
+• If you're about to ask something, turn it into a statement about your analysis
+• Periods, not question marks
 
-Write a single insightful tweet:"""
+Just write one solid tweet that gives people insight:"""
 
         try:
             response = self.model.generate_content(prompt)
@@ -142,6 +148,9 @@ Requirements:
 - No hashtags, no quotes
 - Sound like an experienced trader
 - Include memecoin/micro finance angle
+- NEVER ask questions - always make confident statements and observations
+- Replace any questions with declarative statements about your analysis
+- Use periods instead of question marks
 
 Write a single analytical tweet:"""
 
