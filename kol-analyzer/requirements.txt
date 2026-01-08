@@ -1,0 +1,22 @@
+# KOL Credibility Analyzer - Dependencies
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.5.0
+
+# Browser Automation (optional - for real Twitter scraping)
+playwright>=1.41.0
+
+# Database
+# SQLite is built into Python, no extra dependency needed
+
+# Async support
+asyncio-throttle>=1.0.2
+
+# Development (optional)
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+black>=24.0.0
+isort>=5.13.0
+mypy>=1.8.0
