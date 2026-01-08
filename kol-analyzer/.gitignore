@@ -1,1 +1,16 @@
-kol-analyzer/data/*.db
+# Database files
+data/*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
