@@ -1,0 +1,652 @@
+/* KOL Analyzer Terminal UI - Polar Night Theme */
+/* Nord Color Palette */
+
+/* Polar Night (backgrounds) */
+/* #2e3440 - darkest */
+/* #3b4252 - dark */
+/* #434c5e - medium */
+/* #4c566a - light */
+
+/* Snow Storm (text) */
+/* #d8dee9 - dim */
+/* #e5e9f0 - normal */
+/* #eceff4 - bright */
+
+/* Frost (accents) */
+/* #8fbcbb - teal */
+/* #88c0d0 - cyan */
+/* #81a1c1 - blue */
+/* #5e81ac - dark blue */
+
+/* Aurora (status) */
+/* #bf616a - red */
+/* #d08770 - orange */
+/* #ebcb8b - yellow */
+/* #a3be8c - green */
+/* #b48ead - purple */
+
+Screen {
+    background: #2e3440;
+}
+
+/* Header styling */
+Header {
+    background: #3b4252;
+    color: #88c0d0;
+    text-style: bold;
+    dock: top;
+    height: 3;
+    content-align: center middle;
+}
+
+Header.-tall {
+    height: auto;
+}
+
+/* Footer styling */
+Footer {
+    background: #3b4252;
+    color: #d8dee9;
+}
+
+FooterKey {
+    background: #434c5e;
+    color: #88c0d0;
+}
+
+FooterKey > .footer-key--key {
+    background: #5e81ac;
+    color: #eceff4;
+}
+
+/* Main content containers */
+.main-container {
+    background: #2e3440;
+    padding: 1 2;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 35;
+    background: #3b4252;
+    border-right: solid #434c5e;
+    padding: 1;
+}
+
+.sidebar-title {
+    text-align: center;
+    text-style: bold;
+    color: #88c0d0;
+    padding: 1;
+    background: #434c5e;
+    margin-bottom: 1;
+}
+
+/* Content panel */
+.content-panel {
+    background: #2e3440;
+    padding: 1 2;
+}
+
+/* Stats panel */
+.stats-panel {
+    height: auto;
+    background: #3b4252;
+    border: solid #434c5e;
+    padding: 1 2;
+    margin-bottom: 1;
+}
+
+.stats-title {
+    text-style: bold;
+    color: #88c0d0;
+    text-align: center;
+    margin-bottom: 1;
+}
+
+.stat-item {
+    height: 3;
+    padding: 0 1;
+}
+
+.stat-label {
+    color: #d8dee9;
+}
+
+.stat-value {
+    color: #8fbcbb;
+    text-style: bold;
+}
+
+/* KOL List */
+.kol-list {
+    background: #3b4252;
+    border: solid #434c5e;
+}
+
+.kol-list > .datatable--header {
+    background: #434c5e;
+    color: #88c0d0;
+    text-style: bold;
+}
+
+.kol-list > .datatable--cursor {
+    background: #4c566a;
+    color: #eceff4;
+}
+
+.kol-list > .datatable--hover {
+    background: #434c5e;
+}
+
+DataTable {
+    background: #3b4252;
+    color: #d8dee9;
+}
+
+DataTable > .datatable--header {
+    background: #434c5e;
+    color: #88c0d0;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: #4c566a;
+    color: #eceff4;
+}
+
+DataTable > .datatable--even-row {
+    background: #3b4252;
+}
+
+DataTable > .datatable--odd-row {
+    background: #353c4a;
+}
+
+/* Score display */
+.score-display {
+    height: auto;
+    background: #3b4252;
+    border: solid #434c5e;
+    padding: 2;
+    margin: 1;
+}
+
+.score-large {
+    text-align: center;
+    text-style: bold;
+    color: #eceff4;
+}
+
+.grade-a {
+    color: #a3be8c;
+}
+
+.grade-b {
+    color: #8fbcbb;
+}
+
+.grade-c {
+    color: #ebcb8b;
+}
+
+.grade-d {
+    color: #d08770;
+}
+
+.grade-f {
+    color: #bf616a;
+}
+
+/* Progress bars for scores */
+.score-bar-container {
+    height: 3;
+    margin: 0 1;
+}
+
+.score-label {
+    width: 20;
+    color: #d8dee9;
+}
+
+ProgressBar {
+    padding: 0 1;
+}
+
+ProgressBar > .bar--bar {
+    color: #88c0d0;
+}
+
+ProgressBar > .bar--complete {
+    color: #a3be8c;
+}
+
+ProgressBar.-engagement > .bar--bar {
+    color: #8fbcbb;
+}
+
+ProgressBar.-consistency > .bar--bar {
+    color: #81a1c1;
+}
+
+ProgressBar.-dissonance > .bar--bar {
+    color: #b48ead;
+}
+
+ProgressBar.-baiting > .bar--bar {
+    color: #5e81ac;
+}
+
+/* Flags panel */
+.flags-panel {
+    height: auto;
+    background: #3b4252;
+    border: solid #434c5e;
+    padding: 1;
+    margin: 1 0;
+}
+
+.flags-title {
+    text-style: bold;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+.flags-title.-red {
+    color: #bf616a;
+}
+
+.flags-title.-green {
+    color: #a3be8c;
+}
+
+.flag-item {
+    padding: 0 2;
+    color: #d8dee9;
+}
+
+.flag-item.-red {
+    color: #d08770;
+}
+
+.flag-item.-green {
+    color: #8fbcbb;
+}
+
+/* Input field */
+Input {
+    background: #434c5e;
+    border: solid #4c566a;
+    color: #eceff4;
+    padding: 0 1;
+}
+
+Input:focus {
+    border: solid #88c0d0;
+}
+
+Input.-invalid {
+    border: solid #bf616a;
+}
+
+/* Buttons */
+Button {
+    background: #434c5e;
+    color: #d8dee9;
+    border: none;
+    margin: 0 1;
+    min-width: 12;
+}
+
+Button:hover {
+    background: #4c566a;
+    color: #eceff4;
+}
+
+Button:focus {
+    background: #5e81ac;
+    color: #eceff4;
+}
+
+Button.-primary {
+    background: #5e81ac;
+    color: #eceff4;
+}
+
+Button.-primary:hover {
+    background: #81a1c1;
+}
+
+Button.-success {
+    background: #a3be8c;
+    color: #2e3440;
+}
+
+Button.-warning {
+    background: #ebcb8b;
+    color: #2e3440;
+}
+
+Button.-error {
+    background: #bf616a;
+    color: #eceff4;
+}
+
+/* Labels */
+Label {
+    color: #d8dee9;
+}
+
+.title {
+    text-style: bold;
+    color: #88c0d0;
+}
+
+.subtitle {
+    color: #81a1c1;
+}
+
+.dim {
+    color: #4c566a;
+}
+
+.bright {
+    color: #eceff4;
+}
+
+/* Static text */
+Static {
+    color: #d8dee9;
+}
+
+.header-text {
+    text-style: bold;
+    color: #88c0d0;
+}
+
+/* Containers */
+Horizontal {
+    height: auto;
+}
+
+Vertical {
+    height: auto;
+}
+
+Container {
+    background: transparent;
+}
+
+/* Modal/dialog */
+.modal-container {
+    align: center middle;
+    background: rgba(46, 52, 64, 0.9);
+}
+
+.modal-dialog {
+    background: #3b4252;
+    border: solid #434c5e;
+    padding: 2;
+    width: 60;
+    height: auto;
+}
+
+.modal-title {
+    text-align: center;
+    text-style: bold;
+    color: #88c0d0;
+    margin-bottom: 1;
+}
+
+/* Tabs */
+TabbedContent {
+    background: #2e3440;
+}
+
+Tabs {
+    background: #3b4252;
+}
+
+Tab {
+    background: #3b4252;
+    color: #d8dee9;
+    padding: 1 2;
+}
+
+Tab:hover {
+    background: #434c5e;
+}
+
+Tab.-active {
+    background: #434c5e;
+    color: #88c0d0;
+    text-style: bold;
+}
+
+TabPane {
+    background: #2e3440;
+    padding: 1;
+}
+
+/* RichLog */
+RichLog {
+    background: #3b4252;
+    color: #d8dee9;
+    border: solid #434c5e;
+    padding: 1;
+}
+
+/* Markdown */
+Markdown {
+    background: transparent;
+    color: #d8dee9;
+}
+
+MarkdownH1 {
+    color: #88c0d0;
+    text-style: bold;
+    border-bottom: solid #434c5e;
+    padding-bottom: 1;
+    margin-bottom: 1;
+}
+
+MarkdownH2 {
+    color: #81a1c1;
+    text-style: bold;
+    margin-top: 1;
+}
+
+MarkdownH3 {
+    color: #8fbcbb;
+}
+
+/* Loading indicator */
+LoadingIndicator {
+    background: transparent;
+    color: #88c0d0;
+}
+
+/* Tree view */
+Tree {
+    background: #3b4252;
+    color: #d8dee9;
+}
+
+Tree > .tree--cursor {
+    background: #4c566a;
+    color: #eceff4;
+}
+
+/* Analysis card */
+.analysis-card {
+    background: #3b4252;
+    border: solid #434c5e;
+    padding: 1 2;
+    margin: 1;
+    height: auto;
+}
+
+.card-header {
+    text-style: bold;
+    color: #88c0d0;
+    border-bottom: solid #434c5e;
+    padding-bottom: 1;
+    margin-bottom: 1;
+}
+
+/* Comparison view */
+.compare-container {
+    height: 100%;
+}
+
+.compare-panel {
+    width: 1fr;
+    background: #3b4252;
+    border: solid #434c5e;
+    margin: 0 1;
+    padding: 1;
+}
+
+.compare-header {
+    text-align: center;
+    text-style: bold;
+    color: #88c0d0;
+    background: #434c5e;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+.winner-badge {
+    background: #a3be8c;
+    color: #2e3440;
+    text-style: bold;
+    padding: 0 1;
+}
+
+/* Scrollable containers */
+ScrollableContainer {
+    background: transparent;
+}
+
+VerticalScroll {
+    background: transparent;
+    scrollbar-background: #3b4252;
+    scrollbar-color: #4c566a;
+    scrollbar-color-hover: #5e81ac;
+    scrollbar-color-active: #88c0d0;
+}
+
+/* Sparkline and charts */
+Sparkline {
+    background: #3b4252;
+    color: #88c0d0;
+}
+
+/* Placeholder */
+.placeholder {
+    color: #4c566a;
+    text-align: center;
+    padding: 4;
+}
+
+/* Welcome screen */
+.welcome-container {
+    align: center middle;
+    height: 100%;
+}
+
+.welcome-box {
+    background: #3b4252;
+    border: double #434c5e;
+    padding: 2 4;
+    width: 70;
+    height: auto;
+}
+
+.welcome-title {
+    text-align: center;
+    text-style: bold;
+    color: #88c0d0;
+}
+
+.welcome-subtitle {
+    text-align: center;
+    color: #81a1c1;
+    margin-bottom: 2;
+}
+
+.welcome-text {
+    text-align: center;
+    color: #d8dee9;
+}
+
+/* Metric display */
+.metric-row {
+    height: 3;
+    padding: 0 1;
+}
+
+.metric-name {
+    width: 25;
+    color: #d8dee9;
+}
+
+.metric-value {
+    color: #8fbcbb;
+    text-style: bold;
+}
+
+/* Summary text */
+.summary-text {
+    background: #434c5e;
+    border: solid #4c566a;
+    padding: 1 2;
+    margin: 1 0;
+    color: #e5e9f0;
+}
+
+/* Toast notifications */
+Toast {
+    background: #434c5e;
+    color: #d8dee9;
+    border: solid #5e81ac;
+}
+
+Toast.-information {
+    border: solid #88c0d0;
+}
+
+Toast.-warning {
+    border: solid #ebcb8b;
+}
+
+Toast.-error {
+    border: solid #bf616a;
+}
+
+/* ASCII art header */
+.ascii-header {
+    text-align: center;
+    color: #88c0d0;
+    padding: 1;
+}
+
+/* Search bar */
+.search-container {
+    height: auto;
+    padding: 1;
+    background: #3b4252;
+    border-bottom: solid #434c5e;
+}
+
+/* Empty state */
+.empty-state {
+    align: center middle;
+    height: 100%;
+}
+
+.empty-message {
+    text-align: center;
+    color: #4c566a;
+    padding: 4;
+}

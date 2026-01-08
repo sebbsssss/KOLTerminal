@@ -6,6 +6,8 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 import sys
@@ -95,8 +97,25 @@ def create_app() -> FastAPI:
     db = Database()
     engine = CredibilityEngine()
 
-    @app.get("/", tags=["Health"])
+    # Static files directory
+    static_dir = Path(__file__).parent.parent.parent / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    @app.get("/", tags=["Health"], include_in_schema=False)
     async def root():
+        """Serve the web UI or health check."""
+        index_file = static_dir / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+        return {
+            "status": "healthy",
+            "service": "KOL Credibility Analyzer",
+            "version": "1.0.0"
+        }
+
+    @app.get("/health", tags=["Health"])
+    async def health_check():
         """Health check endpoint."""
         return {
             "status": "healthy",
