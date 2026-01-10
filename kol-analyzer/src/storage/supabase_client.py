@@ -15,7 +15,42 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from supabase import create_client, Client
 
-from ..scraper.twitter_crawler import Tweet, UserProfile
+# Handle both relative and absolute imports for different environments
+try:
+    from ..scraper.twitter_crawler import Tweet, UserProfile
+except ImportError:
+    try:
+        from scraper.twitter_crawler import Tweet, UserProfile
+    except ImportError:
+        # Define minimal dataclasses if imports fail
+        from dataclasses import dataclass
+        from typing import Optional as Opt
+
+        @dataclass
+        class UserProfile:
+            username: str
+            display_name: str
+            bio: str
+            follower_count: int
+            following_count: int
+            tweet_count: int
+            joined_date: str
+            verified: bool = False
+            profile_image_url: str = ""
+
+        @dataclass
+        class Tweet:
+            id: str
+            text: str
+            timestamp: str
+            likes: int
+            retweets: int
+            replies: int
+            has_media: bool = False
+            has_video: bool = False
+            is_quote_tweet: bool = False
+            is_reply: bool = False
+            reply_to: Opt[str] = None
 
 
 class SupabaseDatabase:
