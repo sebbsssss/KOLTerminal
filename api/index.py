@@ -295,6 +295,14 @@ async def analyze_kol(request: AnalyzeRequest):
             demo_mode=crawler.demo_mode
         )
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis failed: {str(e)}\n{traceback.format_exc()}"
+        )
     finally:
         await crawler.close()
 
