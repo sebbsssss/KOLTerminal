@@ -7,6 +7,10 @@ from .prediction_tracker import PredictionTracker, PredictionReport, TokenCall, 
 from .sponsored_detector import SponsoredDetector, SponsoredReport, SponsoredInstance, SponsoredType
 from .follower_quality import FollowerQualityAnalyzer, FollowerQualityReport
 from .archetype_classifier import ArchetypeClassifier, ArchetypeProfile, Archetype, TrustLevel
+from .temporal_analyzer import TemporalAnalyzer, TemporalReport
+from .linguistic_analyzer import LinguisticAnalyzer, LinguisticReport
+from .accountability_tracker import AccountabilityTracker, AccountabilityReport
+from .network_analyzer import NetworkAnalyzer, NetworkReport
 from .credibility_engine import CredibilityEngine, CredibilityScore
 
 __all__ = [
@@ -23,7 +27,7 @@ __all__ = [
     'EngagementBaitReport',
     'BaitType',
     'BaitInstance',
-    # New analyzers
+    # Enhanced analyzers
     'PrivilegeAnalyzer',
     'PrivilegeReport',
     'PrivilegeType',
@@ -39,6 +43,15 @@ __all__ = [
     'SponsoredType',
     'FollowerQualityAnalyzer',
     'FollowerQualityReport',
+    # Depth analyzers
+    'TemporalAnalyzer',
+    'TemporalReport',
+    'LinguisticAnalyzer',
+    'LinguisticReport',
+    'AccountabilityTracker',
+    'AccountabilityReport',
+    'NetworkAnalyzer',
+    'NetworkReport',
     # Archetype classifier
     'ArchetypeClassifier',
     'ArchetypeProfile',
