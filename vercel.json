@@ -3,18 +3,13 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "kol-analyzer/static/**",
-      "use": "@vercel/static"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
     }
   ],
   "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/kol-analyzer/static/$1"
-    },
     {
       "src": "/docs",
       "dest": "/api/index.py"
@@ -64,7 +59,14 @@
       "dest": "/api/index.py"
     }
   ],
+  "functions": {
+    "api/index.py": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
   "env": {
-    "PYTHONPATH": "kol-analyzer/src"
+    "PYTHONPATH": "kol-analyzer/src:kol-analyzer",
+    "DEBUG": "1"
   }
 }
