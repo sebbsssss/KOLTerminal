@@ -578,6 +578,10 @@
         .metric-card.consistency .metric-value { color: var(--success); }
         .metric-card.dissonance .metric-value { color: var(--danger); }
         .metric-card.baiting .metric-value { color: var(--warning); }
+        .metric-card.privilege .metric-value { color: #9333ea; }
+        .metric-card.prediction .metric-value { color: #0891b2; }
+        .metric-card.transparency .metric-value { color: #16a34a; }
+        .metric-card.follower_quality .metric-value { color: #dc2626; }
 
         .metric-bar {
             height: 4px;
@@ -596,6 +600,10 @@
         .metric-card.consistency .metric-bar-fill { background: var(--success); }
         .metric-card.dissonance .metric-bar-fill { background: var(--danger); }
         .metric-card.baiting .metric-bar-fill { background: var(--warning); }
+        .metric-card.privilege .metric-bar-fill { background: #9333ea; }
+        .metric-card.prediction .metric-bar-fill { background: #0891b2; }
+        .metric-card.transparency .metric-bar-fill { background: #16a34a; }
+        .metric-card.follower_quality .metric-bar-fill { background: #dc2626; }
 
         .charts-row {
             display: grid;
@@ -1004,6 +1012,10 @@
             const consistency = analysis.consistency_score || 0;
             const dissonance = analysis.dissonance_score || 0;
             const baiting = analysis.baiting_score || 0;
+            const privilege = analysis.privilege_score || 50;
+            const prediction = analysis.prediction_score || 50;
+            const transparency = analysis.transparency_score || 50;
+            const followerQuality = analysis.follower_quality_score || 50;
             const redFlags = analysis.red_flags || [];
             const greenFlags = analysis.green_flags || [];
             const grade = analysis.grade || '?';
@@ -1072,6 +1084,42 @@
                                 <div class="metric-bar-fill" id="bar-${username}-baiting" style="width: 0%"></div>
                             </div>
                         </div>
+                        <div class="metric-card privilege">
+                            <div class="metric-header">
+                                <span class="metric-name">high horse</span>
+                                <span class="metric-value">${privilege.toFixed(0)}</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-bar-fill" id="bar-${username}-privilege" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card prediction">
+                            <div class="metric-header">
+                                <span class="metric-name">track record</span>
+                                <span class="metric-value">${prediction.toFixed(0)}</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-bar-fill" id="bar-${username}-prediction" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card transparency">
+                            <div class="metric-header">
+                                <span class="metric-name">shill honesty</span>
+                                <span class="metric-value">${transparency.toFixed(0)}</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-bar-fill" id="bar-${username}-transparency" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card follower_quality">
+                            <div class="metric-header">
+                                <span class="metric-name">real simps</span>
+                                <span class="metric-value">${followerQuality.toFixed(0)}</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-bar-fill" id="bar-${username}-follower_quality" style="width: 0%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1127,9 +1175,9 @@
         }
 
         function animateMetricBars(username, analysis) {
-            ['engagement', 'consistency', 'dissonance', 'baiting'].forEach(m => {
+            ['engagement', 'consistency', 'dissonance', 'baiting', 'privilege', 'prediction', 'transparency', 'follower_quality'].forEach(m => {
                 const bar = document.getElementById(`bar-${username}-${m}`);
-                if (bar) bar.style.width = `${analysis[`${m}_score`] || 0}%`;
+                if (bar) bar.style.width = `${analysis[`${m}_score`] || 50}%`;
             });
         }
 
@@ -1138,7 +1186,11 @@
                 engagement: analysis.engagement_score || 0,
                 consistency: analysis.consistency_score || 0,
                 dissonance: analysis.dissonance_score || 0,
-                baiting: analysis.baiting_score || 0
+                baiting: analysis.baiting_score || 0,
+                privilege: analysis.privilege_score || 50,
+                prediction: analysis.prediction_score || 50,
+                transparency: analysis.transparency_score || 50,
+                follower_quality: analysis.follower_quality_score || 50
             };
             drawRadarChart(data, `radar-${username}`);
             drawBarChart(data, `bars-${username}`);
@@ -1153,9 +1205,10 @@
             const radius = Math.min(width, height) / 2 - 30;
             const g = svg.append('g').attr('transform', `translate(${width/2}, ${height/2})`);
 
-            const categories = ['engage', 'consist', 'sus', 'bait'];
-            const values = [data.engagement, data.consistency, data.dissonance, data.baiting];
-            const colors = ['#2383e2', '#0f7b6c', '#e03e3e', '#d9730d'];
+            const categories = ['engage', 'consist', 'sus', 'bait', 'ego', 'record', 'honest', 'real'];
+            const values = [data.engagement, data.consistency, data.dissonance, data.baiting,
+                           data.privilege, data.prediction, data.transparency, data.follower_quality];
+            const colors = ['#2383e2', '#0f7b6c', '#e03e3e', '#d9730d', '#9333ea', '#0891b2', '#16a34a', '#dc2626'];
             const angleSlice = (Math.PI * 2) / categories.length;
 
             for (let i = 1; i <= 4; i++) {
@@ -1180,7 +1233,7 @@
                     .attr('text-anchor', 'middle')
                     .attr('dominant-baseline', 'middle')
                     .attr('fill', colors[i])
-                    .attr('font-size', '10px')
+                    .attr('font-size', '9px')
                     .attr('font-weight', '500')
                     .attr('font-family', 'Inter, sans-serif')
                     .text(cat);
@@ -1203,7 +1256,7 @@
                 g.append('circle')
                     .attr('cx', Math.cos(angle) * (val / 100) * radius)
                     .attr('cy', Math.sin(angle) * (val / 100) * radius)
-                    .attr('r', 4)
+                    .attr('r', 3)
                     .attr('fill', colors[i]);
             });
         }
@@ -1213,21 +1266,26 @@
             if (svg.empty()) return;
             svg.selectAll('*').remove();
 
-            const width = 260, height = 160;
+            const width = 260, height = 280;
             const margin = { top: 8, right: 35, bottom: 8, left: 60 };
             const chartWidth = width - margin.left - margin.right;
             const chartHeight = height - margin.top - margin.bottom;
 
+            svg.attr('height', height);
             const g = svg.append('g').attr('transform', `translate(${margin.left}, ${margin.top})`);
 
             const categories = [
                 { name: 'engage', value: data.engagement, color: '#2383e2' },
                 { name: 'consist', value: data.consistency, color: '#0f7b6c' },
                 { name: 'sus', value: data.dissonance, color: '#e03e3e' },
-                { name: 'bait', value: data.baiting, color: '#d9730d' }
+                { name: 'bait', value: data.baiting, color: '#d9730d' },
+                { name: 'ego', value: data.privilege, color: '#9333ea' },
+                { name: 'record', value: data.prediction, color: '#0891b2' },
+                { name: 'honest', value: data.transparency, color: '#16a34a' },
+                { name: 'real', value: data.follower_quality, color: '#dc2626' }
             ];
 
-            const y = d3.scaleBand().domain(categories.map(d => d.name)).range([0, chartHeight]).padding(0.4);
+            const y = d3.scaleBand().domain(categories.map(d => d.name)).range([0, chartHeight]).padding(0.3);
             const x = d3.scaleLinear().domain([0, 100]).range([0, chartWidth]);
 
             g.selectAll('.bg-bar').data(categories).enter().append('rect')
@@ -1239,7 +1297,7 @@
                 .attr('y', d => y(d.name)).attr('x', 0)
                 .attr('height', y.bandwidth()).attr('width', 0)
                 .attr('fill', d => d.color).attr('rx', 2)
-                .transition().duration(800).delay((d, i) => i * 100)
+                .transition().duration(800).delay((d, i) => i * 80)
                 .attr('width', d => x(d.value));
 
             g.selectAll('.label').data(categories).enter().append('text')
@@ -1247,7 +1305,7 @@
                 .attr('x', -8).attr('text-anchor', 'end')
                 .attr('dominant-baseline', 'middle')
                 .attr('fill', d => d.color)
-                .attr('font-size', '11px').attr('font-weight', '500')
+                .attr('font-size', '10px').attr('font-weight', '500')
                 .attr('font-family', 'Inter, sans-serif')
                 .text(d => d.name);
 
@@ -1256,7 +1314,7 @@
                 .attr('x', d => x(d.value) + 6)
                 .attr('dominant-baseline', 'middle')
                 .attr('fill', d => d.color)
-                .attr('font-size', '11px').attr('font-weight', '600')
+                .attr('font-size', '10px').attr('font-weight', '600')
                 .attr('font-family', 'JetBrains Mono, monospace')
                 .text(d => d.value.toFixed(0));
         }
