@@ -313,7 +313,3 @@ async def list_kols(limit: int = 50):
         return db.list_kols(limit=limit)
     except Exception:
         return []
-
-
-# For Vercel
-handler = app
