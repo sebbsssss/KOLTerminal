@@ -97,6 +97,9 @@ class AnalyzeRequest(BaseModel):
 
 class AnalysisResponse(BaseModel):
     username: str
+    display_name: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    follower_count: Optional[int] = None
     overall_score: float
     grade: str
     confidence: float
@@ -200,8 +203,13 @@ async def analyze_kol(request: AnalyzeRequest):
         try:
             cached = db.get_latest_analysis(username)
             if cached:
+                # Get KOL profile for display info
+                kol = db.get_kol(username)
                 return AnalysisResponse(
                     username=username,
+                    display_name=kol.get('display_name') if kol else None,
+                    profile_image_url=kol.get('profile_image_url') if kol else None,
+                    follower_count=kol.get('follower_count') if kol else None,
                     overall_score=cached['overall_score'],
                     grade=cached['grade'],
                     confidence=cached['confidence'],
@@ -268,6 +276,9 @@ async def analyze_kol(request: AnalyzeRequest):
 
         return AnalysisResponse(
             username=username,
+            display_name=profile.display_name,
+            profile_image_url=profile.profile_image_url,
+            follower_count=profile.follower_count,
             overall_score=result.overall_score,
             grade=result.grade,
             confidence=result.confidence,
