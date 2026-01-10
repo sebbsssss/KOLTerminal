@@ -6,6 +6,7 @@ from .privilege_analyzer import PrivilegeAnalyzer, PrivilegeReport, PrivilegeTyp
 from .prediction_tracker import PredictionTracker, PredictionReport, TokenCall, CallType, CallOutcome
 from .sponsored_detector import SponsoredDetector, SponsoredReport, SponsoredInstance, SponsoredType
 from .follower_quality import FollowerQualityAnalyzer, FollowerQualityReport
+from .archetype_classifier import ArchetypeClassifier, ArchetypeProfile, Archetype, TrustLevel
 from .credibility_engine import CredibilityEngine, CredibilityScore
 
 __all__ = [
@@ -38,6 +39,11 @@ __all__ = [
     'SponsoredType',
     'FollowerQualityAnalyzer',
     'FollowerQualityReport',
+    # Archetype classifier
+    'ArchetypeClassifier',
+    'ArchetypeProfile',
+    'Archetype',
+    'TrustLevel',
     # Main engine
     'CredibilityEngine',
     'CredibilityScore',

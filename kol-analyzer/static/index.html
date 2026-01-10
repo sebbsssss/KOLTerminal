@@ -527,6 +527,57 @@
             font-size: 17px;
         }
 
+        .archetype-box {
+            background: linear-gradient(135deg, var(--bg-cream) 0%, var(--bg-white) 100%);
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 28px;
+            text-align: center;
+        }
+
+        .archetype-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .archetype-emoji {
+            font-size: 28px;
+        }
+
+        .archetype-name {
+            font-family: 'EB Garamond', serif;
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .trust-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .trust-badge.avoid { background: var(--danger-soft); color: var(--danger); }
+        .trust-badge.caution { background: var(--warning-soft); color: var(--warning); }
+        .trust-badge.neutral { background: var(--border); color: var(--text-secondary); }
+        .trust-badge.consider { background: var(--accent-soft); color: var(--accent); }
+        .trust-badge.higher { background: var(--success-soft); color: var(--success); }
+        .trust-badge.entertainment { background: #fef3c7; color: #d97706; }
+
+        .archetype-description {
+            font-family: 'EB Garamond', serif;
+            font-size: 16px;
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
         .metrics-section {
             margin-bottom: 28px;
         }
@@ -894,6 +945,30 @@
             return v[grade] || 'idk what this means';
         }
 
+        function getTrustClass(trustLevel) {
+            const classes = {
+                'avoid': 'avoid',
+                'entertainment_only': 'entertainment',
+                'caution': 'caution',
+                'neutral': 'neutral',
+                'consider': 'consider',
+                'higher_trust': 'higher'
+            };
+            return classes[trustLevel] || 'neutral';
+        }
+
+        function formatTrustLevel(trustLevel) {
+            const labels = {
+                'avoid': 'avoid',
+                'entertainment_only': 'entertainment only',
+                'caution': 'proceed with caution',
+                'neutral': 'neutral',
+                'consider': 'worth considering',
+                'higher_trust': 'more trustworthy'
+            };
+            return labels[trustLevel] || 'unknown';
+        }
+
         function resetSearch() {
             document.getElementById('search-hero').classList.remove('has-results');
             document.getElementById('results-section').classList.remove('visible');
@@ -1043,6 +1118,15 @@
                 <div class="assessment-box">
                     <div class="assessment-badge">${getVerdict(grade)}</div>
                     <div class="assessment-text">${analysis.summary || 'idk what to say about this one. just mid probably'}</div>
+                </div>
+
+                <div class="archetype-box">
+                    <div class="archetype-header">
+                        <span class="archetype-emoji">${analysis.archetype_emoji || '❓'}</span>
+                        <span class="archetype-name">${analysis.archetype || 'Unknown'}</span>
+                        <span class="trust-badge ${getTrustClass(analysis.trust_level)}">${formatTrustLevel(analysis.trust_level)}</span>
+                    </div>
+                    <div class="archetype-description">${analysis.archetype_one_liner || 'Not enough data to classify'}</div>
                 </div>
 
                 <div class="metrics-section">

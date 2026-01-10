@@ -6,6 +6,7 @@ Enhanced with:
 - Prediction Accuracy Tracking
 - Sponsored Content Detection
 - Follower Quality Analysis
+- Archetype Classification
 """
 
 import asyncio
@@ -20,6 +21,7 @@ from .privilege_analyzer import PrivilegeAnalyzer, PrivilegeReport
 from .prediction_tracker import PredictionTracker, PredictionReport
 from .sponsored_detector import SponsoredDetector, SponsoredReport
 from .follower_quality import FollowerQualityAnalyzer, FollowerQualityReport
+from .archetype_classifier import ArchetypeClassifier, ArchetypeProfile
 
 
 @dataclass
@@ -56,6 +58,13 @@ class CredibilityScore:
     sponsored_report: Optional[Dict] = None
     follower_quality_report: Optional[Dict] = None
 
+    # Archetype classification
+    archetype: Optional[str] = None
+    archetype_emoji: Optional[str] = None
+    archetype_one_liner: Optional[str] = None
+    trust_level: Optional[str] = None
+    archetype_report: Optional[Dict] = None
+
     def to_dict(self) -> dict:
         return {
             'overall_score': round(self.overall_score, 1),
@@ -73,6 +82,10 @@ class CredibilityScore:
             'red_flags': self.red_flags,
             'green_flags': self.green_flags,
             'summary': self.summary,
+            'archetype': self.archetype,
+            'archetype_emoji': self.archetype_emoji,
+            'archetype_one_liner': self.archetype_one_liner,
+            'trust_level': self.trust_level,
             'detailed_analysis': {
                 'engagement': self.engagement_report,
                 'consistency': self.consistency_report,
@@ -81,7 +94,8 @@ class CredibilityScore:
                 'privilege': self.privilege_report,
                 'prediction': self.prediction_report,
                 'sponsored': self.sponsored_report,
-                'follower_quality': self.follower_quality_report
+                'follower_quality': self.follower_quality_report,
+                'archetype': self.archetype_report
             }
         }
 
@@ -152,6 +166,9 @@ class CredibilityEngine:
         self.prediction_tracker = PredictionTracker()
         self.sponsored_detector = SponsoredDetector()
         self.follower_quality_analyzer = FollowerQualityAnalyzer()
+
+        # Archetype classifier
+        self.archetype_classifier = ArchetypeClassifier()
 
     def analyze(
         self,
@@ -273,6 +290,29 @@ class CredibilityEngine:
             follower_quality_report
         )
 
+        # Classify archetype
+        archetype_profile = self.archetype_classifier.classify(
+            engagement_score=engagement_score,
+            consistency_score=consistency_score,
+            dissonance_score=dissonance_score,
+            baiting_score=baiting_score,
+            privilege_score=privilege_score,
+            prediction_score=prediction_score,
+            transparency_score=transparency_score,
+            follower_quality_score=follower_quality_score,
+            follower_count=len(tweets) * 100,  # Estimate if not provided
+            tweet_count=len(tweets),
+            account_age_days=account_age_days,
+            privilege_report=privilege_report.to_dict(),
+            baiting_report=baiting_report.to_dict(),
+            sponsored_report=sponsored_report.to_dict(),
+            prediction_report=prediction_report.to_dict()
+        )
+
+        # Get archetype metadata
+        from .archetype_classifier import ARCHETYPE_DEFINITIONS
+        archetype_def = ARCHETYPE_DEFINITIONS.get(archetype_profile.primary_archetype, {})
+
         # Generate summary
         summary = self._generate_summary(
             overall_score,
@@ -302,6 +342,10 @@ class CredibilityEngine:
             red_flags=red_flags,
             green_flags=green_flags,
             summary=summary,
+            archetype=archetype_def.get("name", "Unknown"),
+            archetype_emoji=archetype_def.get("emoji", "❓"),
+            archetype_one_liner=archetype_profile.one_liner,
+            trust_level=archetype_profile.trust_level.value,
             engagement_report=engagement_profile.to_dict(),
             consistency_report=consistency_report.to_dict(),
             dissonance_report=dissonance_report.to_dict(),
@@ -309,7 +353,8 @@ class CredibilityEngine:
             privilege_report=privilege_report.to_dict(),
             prediction_report=prediction_report.to_dict(),
             sponsored_report=sponsored_report.to_dict(),
-            follower_quality_report=follower_quality_report.to_dict()
+            follower_quality_report=follower_quality_report.to_dict(),
+            archetype_report=archetype_profile.to_dict()
         )
 
     def _calculate_grade(self, score: float) -> str:
