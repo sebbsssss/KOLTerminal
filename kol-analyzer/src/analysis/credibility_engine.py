@@ -1,7 +1,19 @@
 """
 Credibility Engine - Combine all analysis scores into a final credibility score.
+
+Enhanced with 12 analysis modules:
+- Privilege/High Horse Analysis
+- Prediction Accuracy Tracking
+- Sponsored Content Detection
+- Follower Quality Analysis
+- Archetype Classification
+- Temporal Analysis (timing vs price action)
+- Linguistic Authenticity Analysis
+- Accountability Tracking
+- Network/Reply Pattern Analysis
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 
@@ -9,6 +21,15 @@ from .engagement_analyzer import EngagementAnalyzer, EngagementProfile
 from .consistency_tracker import ConsistencyTracker, ConsistencyReport
 from .dissonance_analyzer import DissonanceAnalyzer, DissonanceReport
 from .engagement_bait_analyzer import EngagementBaitAnalyzer, EngagementBaitReport
+from .privilege_analyzer import PrivilegeAnalyzer, PrivilegeReport
+from .prediction_tracker import PredictionTracker, PredictionReport
+from .sponsored_detector import SponsoredDetector, SponsoredReport
+from .follower_quality import FollowerQualityAnalyzer, FollowerQualityReport
+from .archetype_classifier import ArchetypeClassifier, ArchetypeProfile
+from .temporal_analyzer import TemporalAnalyzer, TemporalReport
+from .linguistic_analyzer import LinguisticAnalyzer, LinguisticReport
+from .accountability_tracker import AccountabilityTracker, AccountabilityReport
+from .network_analyzer import NetworkAnalyzer, NetworkReport
 
 
 @dataclass
@@ -19,10 +40,23 @@ class CredibilityScore:
     confidence: float  # How confident in assessment (0-100)
     assessment: str  # "HIGH CREDIBILITY", etc.
 
+    # Core scores
     engagement_score: float
     consistency_score: float
     dissonance_score: float
     baiting_score: float
+
+    # New enhanced scores
+    privilege_score: float = 50.0
+    prediction_score: float = 50.0
+    transparency_score: float = 50.0
+    follower_quality_score: float = 50.0
+
+    # Additional depth scores (12 total modules)
+    temporal_score: float = 50.0
+    linguistic_score: float = 50.0
+    accountability_score: float = 50.0
+    network_score: float = 50.0
 
     red_flags: List[str] = field(default_factory=list)
     green_flags: List[str] = field(default_factory=list)
@@ -33,6 +67,21 @@ class CredibilityScore:
     consistency_report: Optional[Dict] = None
     dissonance_report: Optional[Dict] = None
     baiting_report: Optional[Dict] = None
+    privilege_report: Optional[Dict] = None
+    prediction_report: Optional[Dict] = None
+    sponsored_report: Optional[Dict] = None
+    follower_quality_report: Optional[Dict] = None
+    temporal_report: Optional[Dict] = None
+    linguistic_report: Optional[Dict] = None
+    accountability_report: Optional[Dict] = None
+    network_report: Optional[Dict] = None
+
+    # Archetype classification
+    archetype: Optional[str] = None
+    archetype_emoji: Optional[str] = None
+    archetype_one_liner: Optional[str] = None
+    trust_level: Optional[str] = None
+    archetype_report: Optional[Dict] = None
 
     def to_dict(self) -> dict:
         return {
@@ -44,14 +93,35 @@ class CredibilityScore:
             'consistency_score': round(self.consistency_score, 1),
             'dissonance_score': round(self.dissonance_score, 1),
             'baiting_score': round(self.baiting_score, 1),
+            'privilege_score': round(self.privilege_score, 1),
+            'prediction_score': round(self.prediction_score, 1),
+            'transparency_score': round(self.transparency_score, 1),
+            'follower_quality_score': round(self.follower_quality_score, 1),
+            'temporal_score': round(self.temporal_score, 1),
+            'linguistic_score': round(self.linguistic_score, 1),
+            'accountability_score': round(self.accountability_score, 1),
+            'network_score': round(self.network_score, 1),
             'red_flags': self.red_flags,
             'green_flags': self.green_flags,
             'summary': self.summary,
+            'archetype': self.archetype,
+            'archetype_emoji': self.archetype_emoji,
+            'archetype_one_liner': self.archetype_one_liner,
+            'trust_level': self.trust_level,
             'detailed_analysis': {
                 'engagement': self.engagement_report,
                 'consistency': self.consistency_report,
                 'dissonance': self.dissonance_report,
-                'baiting': self.baiting_report
+                'baiting': self.baiting_report,
+                'privilege': self.privilege_report,
+                'prediction': self.prediction_report,
+                'sponsored': self.sponsored_report,
+                'follower_quality': self.follower_quality_report,
+                'temporal': self.temporal_report,
+                'linguistic': self.linguistic_report,
+                'accountability': self.accountability_report,
+                'network': self.network_report,
+                'archetype': self.archetype_report
             }
         }
 
@@ -60,11 +130,19 @@ class CredibilityEngine:
     """
     Combines all analysis modules to generate a final credibility score.
 
-    Scoring weights:
-    - Engagement: 0.20
-    - Consistency: 0.25
-    - Dissonance: 0.25 (hypocrisy + authenticity) / 2
-    - Baiting: 0.30
+    Enhanced scoring weights (12 modules):
+    - Engagement: 0.08
+    - Consistency: 0.10
+    - Dissonance: 0.08
+    - Baiting: 0.10
+    - Privilege: 0.10 (moral high horse detection)
+    - Prediction: 0.10 (track record accuracy)
+    - Transparency: 0.08 (sponsored content disclosure)
+    - Follower Quality: 0.08 (audience authenticity)
+    - Temporal: 0.08 (timing vs price action)
+    - Linguistic: 0.08 (language authenticity)
+    - Accountability: 0.08 (owns mistakes)
+    - Network: 0.06 (interaction patterns)
 
     Grade thresholds:
     - A: 85+
@@ -74,12 +152,20 @@ class CredibilityEngine:
     - F: <40
     """
 
-    # Default weights
+    # Enhanced weights for 12 modules (totals 1.02 for slight variance tolerance)
     DEFAULT_WEIGHTS = {
-        'engagement': 0.20,
-        'consistency': 0.25,
-        'dissonance': 0.25,
-        'baiting': 0.30
+        'engagement': 0.08,
+        'consistency': 0.10,
+        'dissonance': 0.08,
+        'baiting': 0.10,
+        'privilege': 0.10,
+        'prediction': 0.10,
+        'transparency': 0.08,
+        'follower_quality': 0.08,
+        'temporal': 0.08,
+        'linguistic': 0.08,
+        'accountability': 0.08,
+        'network': 0.06
     }
 
     # Grade thresholds
@@ -103,25 +189,42 @@ class CredibilityEngine:
     def __init__(self, weights: Optional[Dict[str, float]] = None):
         self.weights = weights or self.DEFAULT_WEIGHTS
 
-        # Initialize analyzers
+        # Initialize all analyzers (original)
         self.engagement_analyzer = EngagementAnalyzer()
         self.consistency_tracker = ConsistencyTracker()
         self.dissonance_analyzer = DissonanceAnalyzer()
         self.bait_analyzer = EngagementBaitAnalyzer()
 
+        # Initialize enhanced analyzers
+        self.privilege_analyzer = PrivilegeAnalyzer()
+        self.prediction_tracker = PredictionTracker()
+        self.sponsored_detector = SponsoredDetector()
+        self.follower_quality_analyzer = FollowerQualityAnalyzer()
+
+        # Initialize depth analyzers
+        self.temporal_analyzer = TemporalAnalyzer()
+        self.linguistic_analyzer = LinguisticAnalyzer()
+        self.accountability_tracker = AccountabilityTracker()
+        self.network_analyzer = NetworkAnalyzer()
+
+        # Archetype classifier
+        self.archetype_classifier = ArchetypeClassifier()
+
     def analyze(
         self,
         tweets: List[dict],
         follower_count: int,
-        username: str = ""
+        username: str = "",
+        account_age_days: int = 365
     ) -> CredibilityScore:
         """
-        Perform complete credibility analysis.
+        Perform complete credibility analysis with enhanced modules.
 
         Args:
             tweets: List of tweet dictionaries
             follower_count: The KOL's follower count
             username: Optional username for context
+            account_age_days: Account age in days (for privilege analysis)
 
         Returns:
             CredibilityScore with complete analysis
@@ -136,27 +239,91 @@ class CredibilityEngine:
                 consistency_score=50.0,
                 dissonance_score=50.0,
                 baiting_score=50.0,
+                privilege_score=50.0,
+                prediction_score=50.0,
+                transparency_score=50.0,
+                follower_quality_score=50.0,
                 summary="Insufficient data for analysis. Please provide more tweets."
             )
 
-        # Run all analyzers
+        # Run original analyzers
         engagement_profile = self.engagement_analyzer.analyze(tweets, follower_count)
         consistency_report = self.consistency_tracker.analyze(tweets)
         dissonance_report = self.dissonance_analyzer.analyze(tweets)
         baiting_report = self.bait_analyzer.analyze(tweets)
 
-        # Extract scores
+        # Run new analyzers
+        privilege_report = self.privilege_analyzer.analyze(
+            tweets, follower_count, account_age_days
+        )
+        sponsored_report = self.sponsored_detector.analyze(tweets)
+        follower_quality_report = self.follower_quality_analyzer.analyze(
+            tweets, follower_count
+        )
+
+        # Run prediction tracker (async) and temporal analyzer (async)
+        try:
+            prediction_report = asyncio.run(self.prediction_tracker.analyze(tweets))
+        except RuntimeError:
+            # If already in async context, create new loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                prediction_report = loop.run_until_complete(
+                    self.prediction_tracker.analyze(tweets)
+                )
+            finally:
+                loop.close()
+
+        try:
+            temporal_report = asyncio.run(self.temporal_analyzer.analyze(tweets))
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                temporal_report = loop.run_until_complete(
+                    self.temporal_analyzer.analyze(tweets)
+                )
+            finally:
+                loop.close()
+
+        # Run depth analyzers (sync)
+        linguistic_report = self.linguistic_analyzer.analyze(tweets)
+        accountability_report = self.accountability_tracker.analyze(tweets)
+        network_report = self.network_analyzer.analyze(tweets)
+
+        # Extract scores from original analyzers
         engagement_score = engagement_profile.authenticity_score
         consistency_score = consistency_report.consistency_score
         dissonance_score = (dissonance_report.hypocrisy_score + dissonance_report.authenticity_score) / 2
         baiting_score = baiting_report.authenticity_score
 
-        # Calculate weighted overall score
+        # Extract scores from enhanced analyzers
+        privilege_score = (privilege_report.privilege_score + privilege_report.empathy_score) / 2
+        prediction_score = prediction_report.accuracy_score
+        transparency_score = sponsored_report.transparency_score
+        follower_quality_score = follower_quality_report.quality_score
+
+        # Extract scores from depth analyzers
+        temporal_score = temporal_report.timing_score
+        linguistic_score = linguistic_report.authenticity_score
+        accountability_score = accountability_report.accountability_score
+        network_score = network_report.network_score
+
+        # Calculate weighted overall score (12 modules)
         overall_score = (
             engagement_score * self.weights['engagement'] +
             consistency_score * self.weights['consistency'] +
             dissonance_score * self.weights['dissonance'] +
-            baiting_score * self.weights['baiting']
+            baiting_score * self.weights['baiting'] +
+            privilege_score * self.weights['privilege'] +
+            prediction_score * self.weights['prediction'] +
+            transparency_score * self.weights['transparency'] +
+            follower_quality_score * self.weights['follower_quality'] +
+            temporal_score * self.weights['temporal'] +
+            linguistic_score * self.weights['linguistic'] +
+            accountability_score * self.weights['accountability'] +
+            network_score * self.weights['network']
         )
 
         # Determine grade
@@ -166,21 +333,60 @@ class CredibilityEngine:
         # Calculate confidence based on data quality
         confidence = self._calculate_confidence(len(tweets), follower_count)
 
-        # Collect red flags
+        # Collect red flags from all modules
         red_flags = self._collect_red_flags(
             engagement_profile,
             consistency_report,
             dissonance_report,
-            baiting_report
+            baiting_report,
+            privilege_report,
+            prediction_report,
+            sponsored_report,
+            follower_quality_report,
+            temporal_report,
+            linguistic_report,
+            accountability_report,
+            network_report
         )
 
-        # Collect green flags
+        # Collect green flags from all modules
         green_flags = self._collect_green_flags(
             engagement_profile,
             consistency_report,
             dissonance_report,
-            baiting_report
+            baiting_report,
+            privilege_report,
+            prediction_report,
+            sponsored_report,
+            follower_quality_report,
+            temporal_report,
+            linguistic_report,
+            accountability_report,
+            network_report
         )
+
+        # Classify archetype
+        archetype_profile = self.archetype_classifier.classify(
+            engagement_score=engagement_score,
+            consistency_score=consistency_score,
+            dissonance_score=dissonance_score,
+            baiting_score=baiting_score,
+            privilege_score=privilege_score,
+            prediction_score=prediction_score,
+            transparency_score=transparency_score,
+            follower_quality_score=follower_quality_score,
+            follower_count=len(tweets) * 100,  # Estimate if not provided
+            tweet_count=len(tweets),
+            account_age_days=account_age_days,
+            privilege_report=privilege_report.to_dict(),
+            baiting_report=baiting_report.to_dict(),
+            sponsored_report=sponsored_report.to_dict(),
+            prediction_report=prediction_report.to_dict()
+        )
+
+        # Get archetype metadata
+        from .archetype_classifier import ARCHETYPE_DEFINITIONS
+        archetype_def = ARCHETYPE_DEFINITIONS.get(archetype_profile.primary_archetype, {})
 
         # Generate summary
         summary = self._generate_summary(
@@ -190,7 +396,9 @@ class CredibilityEngine:
             engagement_profile,
             consistency_report,
             dissonance_report,
-            baiting_report
+            baiting_report,
+            privilege_report,
+            prediction_report
         )
 
         return CredibilityScore(
@@ -202,13 +410,34 @@ class CredibilityEngine:
             consistency_score=consistency_score,
             dissonance_score=dissonance_score,
             baiting_score=baiting_score,
+            privilege_score=privilege_score,
+            prediction_score=prediction_score,
+            transparency_score=transparency_score,
+            follower_quality_score=follower_quality_score,
+            temporal_score=temporal_score,
+            linguistic_score=linguistic_score,
+            accountability_score=accountability_score,
+            network_score=network_score,
             red_flags=red_flags,
             green_flags=green_flags,
             summary=summary,
+            archetype=archetype_def.get("name", "Unknown"),
+            archetype_emoji=archetype_def.get("emoji", "❓"),
+            archetype_one_liner=archetype_profile.one_liner,
+            trust_level=archetype_profile.trust_level.value,
             engagement_report=engagement_profile.to_dict(),
             consistency_report=consistency_report.to_dict(),
             dissonance_report=dissonance_report.to_dict(),
-            baiting_report=baiting_report.to_dict()
+            baiting_report=baiting_report.to_dict(),
+            privilege_report=privilege_report.to_dict(),
+            prediction_report=prediction_report.to_dict(),
+            sponsored_report=sponsored_report.to_dict(),
+            follower_quality_report=follower_quality_report.to_dict(),
+            temporal_report=temporal_report.to_dict(),
+            linguistic_report=linguistic_report.to_dict(),
+            accountability_report=accountability_report.to_dict(),
+            network_report=network_report.to_dict(),
+            archetype_report=archetype_profile.to_dict()
         )
 
     def _calculate_grade(self, score: float) -> str:
@@ -266,7 +495,15 @@ class CredibilityEngine:
         engagement: EngagementProfile,
         consistency: ConsistencyReport,
         dissonance: DissonanceReport,
-        baiting: EngagementBaitReport
+        baiting: EngagementBaitReport,
+        privilege: PrivilegeReport = None,
+        prediction: PredictionReport = None,
+        sponsored: SponsoredReport = None,
+        follower_quality: FollowerQualityReport = None,
+        temporal: TemporalReport = None,
+        linguistic: LinguisticReport = None,
+        accountability: AccountabilityReport = None,
+        network: NetworkReport = None
     ) -> List[str]:
         """Collect all red flags from analysis."""
         red_flags = []
@@ -309,14 +546,79 @@ class CredibilityEngine:
         if baiting.manipulation_index > 50:
             red_flags.append(f"High manipulation index ({baiting.manipulation_index:.0f}/100)")
 
-        return red_flags[:10]  # Limit to top 10
+        # Privilege/High Horse red flags
+        if privilege:
+            red_flags.extend(privilege.high_horse_indicators[:3])
+            if privilege.privilege_score < 50:
+                red_flags.append("Significant privilege blindness detected")
+            if privilege.empathy_score < 40:
+                red_flags.append("Low empathy for those still struggling")
+
+        # Prediction accuracy red flags
+        if prediction:
+            if prediction.hit_rate < 35 and prediction.total_calls >= 5:
+                red_flags.append(f"Poor prediction accuracy ({prediction.hit_rate:.0f}% hit rate)")
+            if prediction.confidence_calibration == "overconfident":
+                red_flags.append("Overconfident on 'guaranteed' calls that often fail")
+
+        # Sponsored content red flags
+        if sponsored:
+            red_flags.extend(sponsored.red_flags[:2])
+            if sponsored.disclosure_rate < 50 and sponsored.total_promotional > 3:
+                red_flags.append(f"Low disclosure rate on promotions ({sponsored.disclosure_rate:.0f}%)")
+
+        # Follower quality red flags
+        if follower_quality:
+            red_flags.extend(follower_quality.red_flags[:2])
+            if follower_quality.bot_follower_estimate_pct > 30:
+                red_flags.append(f"High estimated bot followers ({follower_quality.bot_follower_estimate_pct:.0f}%)")
+
+        # Temporal red flags
+        if temporal:
+            red_flags.extend(temporal.red_flags[:2])
+            if temporal.front_running_score > 60:
+                red_flags.append(f"Potential front-running behavior ({temporal.front_running_score:.0f}% suspicious timing)")
+
+        # Linguistic red flags
+        if linguistic:
+            red_flags.extend(linguistic.red_flags[:2])
+            if linguistic.manipulation_score > 60:
+                red_flags.append("High linguistic manipulation patterns detected")
+            if linguistic.certainty_score > 80:
+                red_flags.append("Overuse of certainty language (\"guaranteed\", \"100%\")")
+
+        # Accountability red flags
+        if accountability:
+            red_flags.extend(accountability.red_flags[:2])
+            if accountability.cherry_picks_wins:
+                red_flags.append("Only posts wins, hides losses (cherry-picking)")
+            if accountability.deflection_count > 3:
+                red_flags.append(f"Deflects blame frequently ({accountability.deflection_count} instances)")
+
+        # Network red flags
+        if network:
+            red_flags.extend(network.red_flags[:2])
+            if network.reply_guy_score > 70:
+                red_flags.append("Heavy reply guy behavior - little original content")
+            if network.potential_shill_ring:
+                red_flags.append("Part of mutual promotion network (potential shill ring)")
+
+        return red_flags[:15]  # Limit to top 15
 
     def _collect_green_flags(
         self,
         engagement: EngagementProfile,
         consistency: ConsistencyReport,
         dissonance: DissonanceReport,
-        baiting: EngagementBaitReport
+        baiting: EngagementBaitReport,
+        privilege: PrivilegeReport = None,
+        prediction: PredictionReport = None,
+        sponsored: SponsoredReport = None,
+        follower_quality: FollowerQualityReport = None,
+        temporal: TemporalReport = None,
+        linguistic: LinguisticReport = None,
+        accountability: AccountabilityReport = None,
+        network: NetworkReport = None
     ) -> List[str]:
         """Collect positive indicators from analysis."""
         green_flags = []
@@ -353,7 +655,66 @@ class CredibilityEngine:
         if not baiting.engagement_reward_optimization:
             green_flags.append("Not optimizing for reward platforms")
 
-        return green_flags[:8]  # Limit to top 8
+        # Privilege/Empathy green flags
+        if privilege:
+            green_flags.extend(privilege.empathy_indicators[:2])
+            if privilege.privilege_score >= 80:
+                green_flags.append("Shows awareness of their privileged position")
+            if privilege.empathy_score >= 80:
+                green_flags.append("Demonstrates empathy for those still struggling")
+
+        # Prediction accuracy green flags
+        if prediction:
+            if prediction.hit_rate >= 60 and prediction.total_calls >= 5:
+                green_flags.append(f"Strong prediction track record ({prediction.hit_rate:.0f}% hit rate)")
+            if prediction.confidence_calibration == "well-calibrated":
+                green_flags.append("Well-calibrated confidence on predictions")
+
+        # Sponsored content green flags
+        if sponsored:
+            green_flags.extend(sponsored.green_flags[:2])
+            if sponsored.disclosure_rate >= 90:
+                green_flags.append("Excellent transparency on sponsored content")
+
+        # Follower quality green flags
+        if follower_quality:
+            green_flags.extend(follower_quality.green_flags[:2])
+            if follower_quality.quality_score >= 75:
+                green_flags.append("High-quality authentic follower base")
+
+        # Temporal green flags
+        if temporal:
+            green_flags.extend(temporal.green_flags[:2])
+            if temporal.front_running_score < 20:
+                green_flags.append("Timing patterns appear natural")
+            if temporal.crisis_behavior == "supportive":
+                green_flags.append("Supportive during market downturns")
+
+        # Linguistic green flags
+        if linguistic:
+            green_flags.extend(linguistic.green_flags[:2])
+            if linguistic.authenticity_score >= 80:
+                green_flags.append("Natural, authentic language patterns")
+            if linguistic.hedging_ratio > 0.15:
+                green_flags.append("Appropriately hedges uncertain predictions")
+
+        # Accountability green flags
+        if accountability:
+            green_flags.extend(accountability.green_flags[:2])
+            if accountability.takes_responsibility:
+                green_flags.append("Takes responsibility for predictions")
+            if accountability.correction_count > 0:
+                green_flags.append("Publicly corrects mistakes")
+
+        # Network green flags
+        if network:
+            green_flags.extend(network.green_flags[:2])
+            if network.original_ratio > 0.7:
+                green_flags.append("Primarily creates original content")
+            if network.constructive_responses > network.defensive_responses:
+                green_flags.append("Handles criticism constructively")
+
+        return green_flags[:12]  # Limit to top 12
 
     def _generate_summary(
         self,
@@ -363,7 +724,9 @@ class CredibilityEngine:
         engagement: EngagementProfile,
         consistency: ConsistencyReport,
         dissonance: DissonanceReport,
-        baiting: EngagementBaitReport
+        baiting: EngagementBaitReport,
+        privilege: PrivilegeReport = None,
+        prediction: PredictionReport = None
     ) -> str:
         """Generate a human-readable summary of the analysis."""
         name = f"@{username}" if username else "This KOL"
@@ -406,6 +769,20 @@ class CredibilityEngine:
             insights.append("actively participates in reward platforms")
         if baiting.manipulation_index > 40:
             insights.append("uses frequent engagement tactics")
+
+        # Privilege insight (NEW)
+        if privilege:
+            if privilege.privilege_score < 50:
+                insights.append("shows moral high horse tendencies")
+            elif privilege.empathy_score >= 80:
+                insights.append("shows empathy for newcomers")
+
+        # Prediction insight (NEW)
+        if prediction and prediction.total_calls >= 5:
+            if prediction.hit_rate >= 60:
+                insights.append(f"solid track record ({prediction.hit_rate:.0f}% accuracy)")
+            elif prediction.hit_rate < 40:
+                insights.append(f"poor prediction accuracy ({prediction.hit_rate:.0f}%)")
 
         # Combine
         if insights:
