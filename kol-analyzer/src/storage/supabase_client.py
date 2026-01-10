@@ -9,48 +9,43 @@ This module provides a scalable cloud-based storage solution that:
 
 import json
 import os
-from dataclasses import asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from supabase import create_client, Client
 
-# Handle both relative and absolute imports for different environments
-try:
-    from ..scraper.twitter_crawler import Tweet, UserProfile
-except ImportError:
-    try:
-        from scraper.twitter_crawler import Tweet, UserProfile
-    except ImportError:
-        # Define minimal dataclasses if imports fail
-        from dataclasses import dataclass
-        from typing import Optional as Opt
 
-        @dataclass
-        class UserProfile:
-            username: str
-            display_name: str
-            bio: str
-            follower_count: int
-            following_count: int
-            tweet_count: int
-            joined_date: str
-            verified: bool = False
-            profile_image_url: str = ""
+# Define local dataclasses to avoid import issues in serverless environments
+# These are compatible with the twitter_crawler dataclasses
+@dataclass
+class UserProfile:
+    """Twitter user profile data."""
+    username: str
+    display_name: str
+    bio: str
+    follower_count: int
+    following_count: int
+    tweet_count: int
+    joined_date: str
+    verified: bool = False
+    profile_image_url: str = ""
 
-        @dataclass
-        class Tweet:
-            id: str
-            text: str
-            timestamp: str
-            likes: int
-            retweets: int
-            replies: int
-            has_media: bool = False
-            has_video: bool = False
-            is_quote_tweet: bool = False
-            is_reply: bool = False
-            reply_to: Opt[str] = None
+
+@dataclass
+class Tweet:
+    """Tweet data structure."""
+    id: str
+    text: str
+    timestamp: str
+    likes: int
+    retweets: int
+    replies: int
+    has_media: bool = False
+    has_video: bool = False
+    is_quote_tweet: bool = False
+    is_reply: bool = False
+    reply_to: Optional[str] = None
 
 
 class SupabaseDatabase:
