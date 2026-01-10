@@ -131,28 +131,28 @@ Just write one solid tweet that gives people insight:"""
     
     def generate_btc_eth_analysis(self) -> str:
         """Generate BTC/ETH technical analysis with memecoin context"""
-        prompt = """Create a technical analysis tweet (max 280 chars) about BTC and ETH market structure, with context for how it affects the memecoin/altcoin market.
+        prompt = """Let's break down the BTC and ETH market structure and what it means for the little guys (memecoins/alts). Write one tweet (max 280 chars) that connects the dots.
 
-Focus on:
-- BTC dominance trends
-- ETH ecosystem developments  
-- How major moves affect memecoin liquidity
-- Technical levels and market structure
-- Risk-on vs risk-off sentiment
-- Correlation patterns
+Here's what to hit on:
+• BTC dominance - what's it telling us right now?
+• What's happening in the ETH ecosystem that people should know
+• How the big moves from the giants are hitting memecoin liquidity
+• Key technical levels and overall market structure
+• Are we risk-on or risk-off? What's the sentiment?
+• What are the correlation patterns we're seeing?
 
-Requirements:
-- Professional technical analysis language
-- Connect macro to micro (how BTC/ETH moves affect smaller caps)
-- No financial advice disclaimers
-- No hashtags, no quotes
-- Sound like an experienced trader
-- Include memecoin/micro finance angle
-- NEVER ask questions - always make confident statements and observations
-- Replace any questions with declarative statements about your analysis
-- Use periods instead of question marks
+How to write it:
+• Sound like you've been doing this for a while - use real TA language
+• Connect the macro (BTC/ETH) to the micro (memecoins)
+• We're not giving financial advice here, just reading the charts
+• No hashtags, no quotes
+• Sound like a trader who's sharing alpha
+• Weave in the memecoin/micro finance angle
+• Never ask questions - just make confident statements and observations
+• If you feel a question coming on, rephrase it as a confident take
+• Use periods, not question marks
 
-Write a single analytical tweet:"""
+Write one tweet that gives people a solid, analytical takeaway:"""
 
         try:
             response = self.model.generate_content(prompt)

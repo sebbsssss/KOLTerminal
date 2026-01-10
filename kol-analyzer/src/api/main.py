@@ -20,6 +20,14 @@ from src.scraper.twitter_crawler import TwitterCrawler
 from src.storage.database import Database
 from src.analysis.credibility_engine import CredibilityEngine
 
+# Load config
+import json
+CONFIG_PATH = Path(__file__).parent.parent.parent / "data" / "config.json"
+CONFIG = {}
+if CONFIG_PATH.exists():
+    with open(CONFIG_PATH) as f:
+        CONFIG = json.load(f)
+
 
 # Pydantic models for API
 class AnalyzeRequest(BaseModel):
@@ -163,7 +171,7 @@ def create_app() -> FastAPI:
                 )
 
         # Fetch tweets
-        crawler = TwitterCrawler()
+        crawler = TwitterCrawler(rapidapi_key=CONFIG.get("rapidapi_key", ""))
         try:
             await crawler.initialize()
 

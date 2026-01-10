@@ -1,22 +1,22 @@
-"""Twitter/X crawler with Playwright automation and demo mode fallback."""
+"""Twitter/X crawler with API support and demo mode fallback."""
 
 import asyncio
 import json
 import random
-from dataclasses import dataclass, field
+import os
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
-import re
 
-from .rate_limiter import HumanLikeRateLimiter, SimpleRateLimiter
+from .rate_limiter import SimpleRateLimiter
 
-# Try to import Playwright
+# Try to import tweepy for API access
 try:
-    from playwright.async_api import async_playwright, Browser, Page
-    PLAYWRIGHT_AVAILABLE = True
+    import tweepy
+    TWEEPY_AVAILABLE = True
 except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
+    TWEEPY_AVAILABLE = False
 
 
 @dataclass
@@ -51,121 +51,114 @@ class Tweet:
 
 class TwitterCrawler:
     """
-    Twitter/X crawler with Playwright browser automation.
-    Falls back to demo mode when Playwright is unavailable or not authenticated.
+    Twitter/X crawler with RapidAPI support.
+    Falls back to demo mode when API is unavailable.
     """
+
+    # Rate limiting: track monthly usage
+    MONTHLY_LIMIT = 100
+    DEFAULT_TWEETS_PER_USER = 10  # Conservative to save quota
 
     def __init__(
         self,
-        cookies_path: str = "data/cookies.json",
-        headless: bool = True,
-        timeout: int = 30000
+        rapidapi_key: str = None,
+        max_tweets_per_user: int = 10,
+        usage_file: str = "data/api_usage.json"
     ):
-        self.cookies_path = Path(cookies_path)
-        self.headless = headless
-        self.timeout = timeout
-        self.browser: Optional[Any] = None
-        self.page: Optional[Any] = None
-        self.rate_limiter = HumanLikeRateLimiter()
-        self._demo_mode = not PLAYWRIGHT_AVAILABLE
+        # RapidAPI credentials - check env vars or use provided
+        self.rapidapi_key = rapidapi_key or os.environ.get("RAPIDAPI_KEY", "")
+
+        self.max_tweets = min(max_tweets_per_user, self.DEFAULT_TWEETS_PER_USER)
+        self.usage_file = Path(usage_file)
+        self.rate_limiter = SimpleRateLimiter()
+
+        self._demo_mode = not self.rapidapi_key
         self._authenticated = False
+
+        # Load usage tracking
+        self._usage = self._load_usage()
+
+    def _load_usage(self) -> dict:
+        """Load API usage tracking."""
+        if self.usage_file.exists():
+            try:
+                with open(self.usage_file, 'r') as f:
+                    usage = json.load(f)
+                    # Reset if new month
+                    if usage.get('month') != datetime.now().strftime('%Y-%m'):
+                        return {'month': datetime.now().strftime('%Y-%m'), 'tweets_fetched': 0}
+                    return usage
+            except:
+                pass
+        return {'month': datetime.now().strftime('%Y-%m'), 'tweets_fetched': 0}
+
+    def _save_usage(self):
+        """Save API usage tracking."""
+        self.usage_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.usage_file, 'w') as f:
+            json.dump(self._usage, f)
+
+    def _can_fetch(self, count: int) -> bool:
+        """Check if we have quota remaining."""
+        return self._usage['tweets_fetched'] + count <= self.MONTHLY_LIMIT
+
+    def _record_usage(self, count: int):
+        """Record tweets fetched."""
+        self._usage['tweets_fetched'] += count
+        self._save_usage()
+        remaining = self.MONTHLY_LIMIT - self._usage['tweets_fetched']
+        print(f"  [API] Used {count} tweets. Remaining this month: {remaining}/{self.MONTHLY_LIMIT}")
 
     @property
     def demo_mode(self) -> bool:
         """Check if running in demo mode."""
         return self._demo_mode or not self._authenticated
 
+    @property
+    def remaining_quota(self) -> int:
+        """Get remaining monthly quota."""
+        return max(0, self.MONTHLY_LIMIT - self._usage['tweets_fetched'])
+
     async def initialize(self) -> bool:
         """
-        Initialize the browser and check authentication.
+        Initialize the RapidAPI client (Twitter241 API).
 
         Returns:
             True if successfully authenticated, False if in demo mode.
         """
-        if not PLAYWRIGHT_AVAILABLE:
-            print("  [Demo Mode] Playwright not installed - using simulated data")
+        if not self.rapidapi_key:
+            print("  [Demo Mode] No RapidAPI key - using simulated data")
+            print("  Get a free key at: https://rapidapi.com/davethebeast/api/twitter241")
             self._demo_mode = True
-            self.rate_limiter = SimpleRateLimiter()
             return False
 
         try:
-            playwright = await async_playwright().start()
-            self.browser = await playwright.chromium.launch(headless=self.headless)
+            import requests
 
-            # Try to load cookies
-            if self.cookies_path.exists():
-                context = await self.browser.new_context()
-                with open(self.cookies_path, 'r') as f:
-                    cookies = json.load(f)
-                await context.add_cookies(cookies)
-                self.page = await context.new_page()
+            # Test the API with a simple request
+            url = "https://twitter241.p.rapidapi.com/user"
+            headers = {
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "twitter241.p.rapidapi.com"
+            }
+            params = {"username": "elonmusk"}  # Test with a known account
 
-                # Verify authentication
-                await self.page.goto("https://twitter.com/home", timeout=self.timeout)
-                await asyncio.sleep(2)
+            response = requests.get(url, headers=headers, params=params, timeout=10)
 
-                if "login" not in self.page.url.lower():
-                    self._authenticated = True
-                    self._demo_mode = False
-                    print("  [Authenticated] Using real Twitter data")
-                    return True
-
-            print("  [Demo Mode] No valid authentication - using simulated data")
-            self._demo_mode = True
-            self.rate_limiter = SimpleRateLimiter()
-            return False
+            if response.status_code == 200:
+                self._authenticated = True
+                self._demo_mode = False
+                remaining = self.remaining_quota
+                print(f"  [RapidAPI] Twitter241 API authenticated. Quota remaining: {remaining}/{self.MONTHLY_LIMIT}")
+                return True
+            elif response.status_code == 403:
+                raise Exception("Invalid RapidAPI key or not subscribed to this API")
+            else:
+                raise Exception(f"API test failed: {response.status_code}")
 
         except Exception as e:
-            print(f"  [Demo Mode] Browser init failed: {e}")
+            print(f"  [Demo Mode] RapidAPI auth failed: {e}")
             self._demo_mode = True
-            self.rate_limiter = SimpleRateLimiter()
-            return False
-
-    async def login_manual(self) -> bool:
-        """
-        Open a browser window for manual Twitter login and save cookies.
-
-        Returns:
-            True if login successful and cookies saved.
-        """
-        if not PLAYWRIGHT_AVAILABLE:
-            print("Error: Playwright is not installed.")
-            print("Install it with: pip install playwright && playwright install chromium")
-            return False
-
-        try:
-            playwright = await async_playwright().start()
-            browser = await playwright.chromium.launch(headless=False)
-            context = await browser.new_context()
-            page = await context.new_page()
-
-            print("\n" + "=" * 60)
-            print("Manual Twitter Login")
-            print("=" * 60)
-            print("\n1. A browser window will open to Twitter")
-            print("2. Log in to your Twitter account")
-            print("3. Once logged in, press Enter here to save cookies")
-            print("=" * 60 + "\n")
-
-            await page.goto("https://twitter.com/login")
-
-            input("Press Enter after you've logged in to Twitter...")
-
-            # Save cookies
-            cookies = await context.cookies()
-            self.cookies_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.cookies_path, 'w') as f:
-                json.dump(cookies, f)
-
-            print(f"\nCookies saved to {self.cookies_path}")
-
-            await browser.close()
-            await playwright.stop()
-
-            return True
-
-        except Exception as e:
-            print(f"Login failed: {e}")
             return False
 
     async def get_user_profile(
@@ -174,187 +167,177 @@ class TwitterCrawler:
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> Optional[UserProfile]:
         """
-        Get a Twitter user's profile information.
-
-        Args:
-            username: Twitter username (without @)
-            progress_callback: Optional callback for progress updates
-
-        Returns:
-            UserProfile or None if user not found
+        Get a Twitter user's profile information using Twitter241 API.
         """
         if self.demo_mode:
             return self._get_demo_profile(username)
 
         try:
-            await self.rate_limiter.wait()
+            import requests
 
             if progress_callback:
                 progress_callback(f"Fetching profile for @{username}")
 
-            await self.page.goto(
-                f"https://twitter.com/{username}",
-                timeout=self.timeout
-            )
-            await asyncio.sleep(2)
+            url = "https://twitter241.p.rapidapi.com/user"
+            headers = {
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "twitter241.p.rapidapi.com"
+            }
+            params = {"username": username}
 
-            # Extract profile data using JavaScript
-            profile_data = await self.page.evaluate("""
-                () => {
-                    const displayName = document.querySelector('[data-testid="UserName"]')?.innerText?.split('\\n')[0] || '';
-                    const bio = document.querySelector('[data-testid="UserDescription"]')?.innerText || '';
-                    const stats = document.querySelectorAll('[data-testid="primaryColumn"] a[href*="/following"], [data-testid="primaryColumn"] a[href*="/verified_followers"]');
+            response = requests.get(url, headers=headers, params=params, timeout=15)
 
-                    let followers = 0, following = 0;
-                    stats.forEach(stat => {
-                        const text = stat.innerText.toLowerCase();
-                        const num = parseInt(text.replace(/[^0-9]/g, '')) || 0;
-                        if (text.includes('following')) following = num;
-                        if (text.includes('follower')) followers = num;
-                    });
+            if response.status_code == 200:
+                data = response.json()
+                user_result = data.get("result", {}).get("data", {}).get("user", {}).get("result", {})
+                legacy = user_result.get("legacy", {})
+                core = user_result.get("core", {})
 
-                    return {displayName, bio, followers, following};
-                }
-            """)
-
-            return UserProfile(
-                username=username,
-                display_name=profile_data.get('displayName', username),
-                bio=profile_data.get('bio', ''),
-                follower_count=profile_data.get('followers', 0),
-                following_count=profile_data.get('following', 0),
-                tweet_count=0,  # Hard to get accurately
-                joined_date="",
-                verified=False
-            )
+                return UserProfile(
+                    username=core.get("screen_name", legacy.get("screen_name", username)),
+                    display_name=core.get("name", legacy.get("name", username)),
+                    bio=legacy.get("description", ""),
+                    follower_count=legacy.get("followers_count", 0),
+                    following_count=legacy.get("friends_count", 0),
+                    tweet_count=legacy.get("statuses_count", 0),
+                    joined_date=core.get("created_at", legacy.get("created_at", "")),
+                    verified=legacy.get("verified", False) or user_result.get("is_blue_verified", False),
+                    profile_image_url=legacy.get("profile_image_url_https", "")
+                )
+            else:
+                raise Exception(f"API error: {response.status_code} - {response.text}")
 
         except Exception as e:
             if progress_callback:
                 progress_callback(f"Error fetching profile: {e}")
+            print(f"  [Warning] RapidAPI error for @{username}, using demo data: {e}")
             return self._get_demo_profile(username)
 
     async def get_user_tweets(
         self,
         username: str,
-        max_tweets: int = 200,
+        max_tweets: int = 10,
         include_replies: bool = False,
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> List[Tweet]:
         """
-        Get a user's tweets.
-
-        Args:
-            username: Twitter username (without @)
-            max_tweets: Maximum number of tweets to fetch
-            include_replies: Whether to include replies
-            progress_callback: Optional callback for progress updates
-
-        Returns:
-            List of Tweet objects
+        Get a user's tweets using Twitter241 API (limited to save quota).
         """
+        # Enforce conservative limit
+        max_tweets = min(max_tweets, self.max_tweets, 10)
+
         if self.demo_mode:
             return self._get_demo_tweets(username, max_tweets, progress_callback)
 
-        tweets = []
+        # Check quota
+        if not self._can_fetch(max_tweets):
+            print(f"  [Warning] API quota exhausted ({self._usage['tweets_fetched']}/{self.MONTHLY_LIMIT}). Using demo data.")
+            return self._get_demo_tweets(username, max_tweets, progress_callback)
+
         try:
-            url = f"https://twitter.com/{username}"
-            if not include_replies:
-                url += "/with_replies"  # Counterintuitive but this excludes replies
+            import requests
 
-            await self.page.goto(url, timeout=self.timeout)
-            await asyncio.sleep(3)
+            if progress_callback:
+                progress_callback(f"Fetching tweets for @{username} (max {max_tweets})")
 
-            last_count = 0
-            stale_count = 0
+            headers = {
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "twitter241.p.rapidapi.com"
+            }
 
-            while len(tweets) < max_tweets and stale_count < 5:
-                # Extract tweets from current view
-                new_tweets = await self._extract_tweets_from_page()
+            # First get user ID
+            user_url = "https://twitter241.p.rapidapi.com/user"
+            user_response = requests.get(user_url, headers=headers, params={"username": username}, timeout=15)
 
-                for tweet in new_tweets:
-                    if tweet.id not in [t.id for t in tweets]:
-                        tweets.append(tweet)
-                        if progress_callback:
-                            progress_callback(f"Collected: {len(tweets)} tweets")
+            if user_response.status_code != 200:
+                raise Exception(f"User lookup failed: {user_response.text}")
 
-                # Check for progress
-                if len(tweets) == last_count:
-                    stale_count += 1
-                else:
-                    stale_count = 0
-                last_count = len(tweets)
+            user_data = user_response.json()
+            user_id = user_data.get("result", {}).get("data", {}).get("user", {}).get("result", {}).get("rest_id")
 
-                # Scroll down
-                await self.rate_limiter.wait()
-                await self.page.evaluate("window.scrollBy(0, 1000)")
-                await asyncio.sleep(2)
+            if not user_id:
+                raise Exception("Could not get user ID")
 
-            return tweets[:max_tweets]
+            # Now get tweets
+            tweets_url = "https://twitter241.p.rapidapi.com/user-tweets"
+            params = {"user": user_id, "count": str(max_tweets)}
+
+            response = requests.get(tweets_url, headers=headers, params=params, timeout=20)
+
+            if response.status_code != 200:
+                raise Exception(f"Tweets API error: {response.status_code} - {response.text}")
+
+            tweets = []
+            result = response.json()
+
+            # Parse the timeline instructions
+            instructions = result.get("result", {}).get("timeline", {}).get("instructions", [])
+
+            for instruction in instructions:
+                entries = instruction.get("entries", [])
+                if instruction.get("type") == "TimelinePinEntry":
+                    entries = [instruction.get("entry", {})]
+
+                for entry in entries:
+                    if len(tweets) >= max_tweets:
+                        break
+
+                    content = entry.get("content", {})
+                    item_content = content.get("itemContent", {})
+                    tweet_results = item_content.get("tweet_results", {}).get("result", {})
+
+                    if tweet_results.get("__typename") != "Tweet":
+                        continue
+
+                    legacy = tweet_results.get("legacy", {})
+
+                    # Get text
+                    text = legacy.get("full_text", "")
+
+                    # Get metrics
+                    likes = legacy.get("favorite_count", 0)
+                    retweets = legacy.get("retweet_count", 0)
+                    replies = legacy.get("reply_count", 0)
+
+                    # Check for media
+                    has_media = "media" in legacy.get("entities", {})
+                    has_video = any(
+                        m.get("type") == "video"
+                        for m in legacy.get("extended_entities", {}).get("media", [])
+                    )
+
+                    tweet = Tweet(
+                        id=tweet_results.get("rest_id", ""),
+                        text=text,
+                        timestamp=legacy.get("created_at", ""),
+                        likes=likes,
+                        retweets=retweets,
+                        replies=replies,
+                        has_media=has_media,
+                        has_video=has_video,
+                        is_quote_tweet=legacy.get("is_quote_status", False),
+                        is_reply=legacy.get("in_reply_to_status_id_str") is not None,
+                        reply_to=legacy.get("in_reply_to_screen_name")
+                    )
+                    tweets.append(tweet)
+
+            # Record usage
+            self._record_usage(len(tweets))
+
+            if progress_callback:
+                progress_callback(f"Fetched {len(tweets)} tweets for @{username}")
+
+            return tweets
 
         except Exception as e:
             if progress_callback:
                 progress_callback(f"Error fetching tweets: {e}")
-            if not tweets:
-                return self._get_demo_tweets(username, max_tweets, progress_callback)
-            return tweets
-
-    async def _extract_tweets_from_page(self) -> List[Tweet]:
-        """Extract tweets from the current page state."""
-        tweets_data = await self.page.evaluate("""
-            () => {
-                const tweets = [];
-                document.querySelectorAll('[data-testid="tweet"]').forEach(tweet => {
-                    try {
-                        const text = tweet.querySelector('[data-testid="tweetText"]')?.innerText || '';
-                        const time = tweet.querySelector('time')?.getAttribute('datetime') || '';
-                        const link = tweet.querySelector('a[href*="/status/"]')?.href || '';
-                        const id = link.split('/status/')[1]?.split('?')[0] || '';
-
-                        const metrics = tweet.querySelectorAll('[data-testid$="count"]');
-                        let likes = 0, retweets = 0, replies = 0;
-
-                        metrics.forEach(m => {
-                            const val = parseInt(m.innerText.replace(/[^0-9]/g, '')) || 0;
-                            const testId = m.getAttribute('data-testid') || '';
-                            if (testId.includes('like')) likes = val;
-                            if (testId.includes('retweet')) retweets = val;
-                            if (testId.includes('reply')) replies = val;
-                        });
-
-                        const hasMedia = tweet.querySelector('[data-testid="tweetPhoto"]') !== null;
-                        const hasVideo = tweet.querySelector('[data-testid="videoPlayer"]') !== null;
-                        const isQuote = tweet.querySelector('[data-testid="quoteTweet"]') !== null;
-
-                        if (id && text) {
-                            tweets.push({id, text, timestamp: time, likes, retweets, replies, hasMedia, hasVideo, isQuote});
-                        }
-                    } catch (e) {}
-                });
-                return tweets;
-            }
-        """)
-
-        return [
-            Tweet(
-                id=t['id'],
-                text=t['text'],
-                timestamp=t['timestamp'],
-                likes=t['likes'],
-                retweets=t['retweets'],
-                replies=t['replies'],
-                has_media=t['hasMedia'],
-                has_video=t['hasVideo'],
-                is_quote_tweet=t['isQuote']
-            )
-            for t in tweets_data
-        ]
+            print(f"  [Warning] RapidAPI error for @{username}, using demo data: {e}")
+            return self._get_demo_tweets(username, max_tweets, progress_callback)
 
     async def close(self):
-        """Close the browser and clean up."""
-        if self.browser:
-            await self.browser.close()
-            self.browser = None
-            self.page = None
+        """Clean up resources."""
+        self._client = None
 
     # =========================================================================
     # Demo Mode Data Generation
@@ -367,17 +350,20 @@ class TwitterCrawler:
         if username.lower() in profiles:
             return profiles[username.lower()]
 
-        # Generate random profile for unknown users
-        return UserProfile(
+        # Generate consistent profile for unknown users
+        random.seed(hash(username.lower()))
+        profile = UserProfile(
             username=username,
             display_name=f"{username.title()} (Demo)",
             bio="Crypto enthusiast | Not financial advice | DYOR",
-            follower_count=random.randint(5000, 500000),
+            follower_count=random.randint(1000, 50000),
             following_count=random.randint(100, 2000),
-            tweet_count=random.randint(1000, 50000),
-            joined_date="2020-01-15",
-            verified=random.random() > 0.7
+            tweet_count=random.randint(500, 10000),
+            joined_date="2021-01-15",
+            verified=random.random() > 0.8
         )
+        random.seed()
+        return profile
 
     def _get_demo_profiles(self) -> Dict[str, UserProfile]:
         """Get predefined demo profiles."""
@@ -412,26 +398,6 @@ class TwitterCrawler:
                 joined_date="2018-09-10",
                 verified=True
             ),
-            "hsaka_": UserProfile(
-                username="hsaka_",
-                display_name="Hsaka",
-                bio="Full-time trader | Sharing alpha | Join my telegram for calls",
-                follower_count=180000,
-                following_count=560,
-                tweet_count=35000,
-                joined_date="2020-11-05",
-                verified=False
-            ),
-            "cryptokaleo": UserProfile(
-                username="CryptoKaleo",
-                display_name="K A L E O",
-                bio="Charts and vibes | $BTC maxi adjacent | Not your financial advisor",
-                follower_count=520000,
-                following_count=380,
-                tweet_count=52000,
-                joined_date="2019-02-28",
-                verified=True
-            ),
         }
 
     def _get_demo_tweets(
@@ -444,28 +410,19 @@ class TwitterCrawler:
         tweet_templates = self._get_demo_tweet_templates(username.lower())
         tweets = []
 
-        # Use seeded random for consistency per username
         random.seed(hash(username.lower()))
-
         base_time = datetime.now()
 
         for i in range(max_tweets):
-            # Pick a template and customize it
             template = random.choice(tweet_templates)
 
-            # Generate engagement based on profile size
-            profiles = self._get_demo_profiles()
-            profile = profiles.get(username.lower(), self._get_demo_profile(username))
-
-            base_likes = profile.follower_count * random.uniform(0.01, 0.08)
-            variance = random.uniform(0.3, 3.0)  # High variance for realism
-
-            likes = int(base_likes * variance)
+            # Generate engagement
+            base_likes = random.randint(50, 5000)
+            likes = int(base_likes * random.uniform(0.5, 2.0))
             retweets = int(likes * random.uniform(0.05, 0.25))
             replies = int(likes * random.uniform(0.02, 0.15))
 
-            # Calculate timestamp (tweets spread over ~90 days)
-            hours_ago = random.uniform(0.5, 90 * 24)
+            hours_ago = random.uniform(1, 72)
             timestamp = base_time - timedelta(hours=hours_ago)
 
             tweet = Tweet(
@@ -479,110 +436,26 @@ class TwitterCrawler:
                 has_video=template.get('has_video', False),
                 is_quote_tweet=template.get('is_quote', False)
             )
-
             tweets.append(tweet)
 
-            if progress_callback and i % 20 == 0:
-                progress_callback(f"Collected: {len(tweets)} tweets")
-
-        # Reset random seed
         random.seed()
 
         if progress_callback:
-            progress_callback(f"Collected: {len(tweets)} tweets (demo mode)")
+            progress_callback(f"Generated {len(tweets)} demo tweets for @{username}")
 
         return tweets
 
     def _get_demo_tweet_templates(self, username: str) -> List[Dict]:
-        """Get tweet templates based on username persona."""
-
-        # Default templates with variety of patterns
-        default_templates = [
-            # Bullish tweets
-            {"text": "$BTC looking incredibly bullish here. This is the accumulation zone everyone will wish they bought. Not financial advice but I'm loading up.", "has_media": True},
-            {"text": "$SOL about to absolutely send it. The ecosystem growth is undeniable. 100x from here is programmed.", "has_media": False},
-            {"text": "If you're not accumulating $ETH at these levels, you're going to regret it. This is generational wealth territory.", "has_media": False},
-            {"text": "Just went 10x long on $BTC. This is the play. Watch this space.", "has_media": True},
-            {"text": "$ARB is the most undervalued L2 play right now. Easy 5x from here. Mark this tweet.", "has_media": False},
-
-            # Bearish tweets (for consistency tracking)
-            {"text": "Getting concerned about $BTC here. The chart doesn't look great. Reducing exposure.", "has_media": True},
-            {"text": "I've been wrong about $SOL. The network issues are a real problem. Exiting my position.", "has_media": False},
-            {"text": "Market structure looking weak. Time to derisk. Cash is a position too.", "has_media": False},
-
-            # Engagement bait patterns
-            {"text": "What's your highest conviction play right now? Drop it below 👇", "has_media": False},
-            {"text": "Like if you're bullish on crypto in 2024. RT if you think we hit new ATH this year.", "has_media": False},
-            {"text": "Name your favorite memecoin. Wrong answers only 😂", "has_media": False},
-            {"text": "Follow for more alpha. I'm giving away 1 ETH to someone who RTs this.", "has_media": True},
-
-            # FOMO patterns
-            {"text": "INSIDER INFO: This token is about to pump. Last chance to get in before 100x. Don't say I didn't warn you.", "has_media": False},
-            {"text": "The alpha I'm about to drop will change your life. But first, follow me and RT for access.", "has_media": False},
-            {"text": "This is your FINAL opportunity to get into $XYZ before it moons. Not financial advice but I'm all in.", "has_media": False},
-
-            # Derisive/mocking tweets
-            {"text": "NGMI if you sold the bottom. Literally couldn't be me. 🤡", "has_media": False},
-            {"text": "Have fun staying poor. Some of y'all really don't deserve to make it.", "has_media": False},
-            {"text": "Imagine selling $BTC below 50k. Skill issue tbh.", "has_media": False},
-            {"text": "Paper hands getting shaken out as usual. Weak.", "has_media": False},
-
-            # Instructional/helpful tweets
-            {"text": "Here's a thread on how to identify rug pulls before they happen. Save this. 🧵", "has_media": False},
-            {"text": "Pro tip for beginners: Never invest more than you can afford to lose. DYOR always.", "has_media": False},
-            {"text": "Let me explain how to read order flow. This changed my trading completely.", "has_media": True},
-            {"text": "Step by step guide to setting up a hardware wallet. Security first, always. NFA", "has_media": True},
-
-            # Kaito/reward gaming
-            {"text": "Bullish on $KAITO. Yapping to earn is the future. Make sure to engage for points!", "has_media": False},
-            {"text": "Drop your @Kaito_ai yaps below. Let's farm some points together!", "has_media": False},
-            {"text": "Complete the Galxe quest for this project. Free airdrop incoming.", "has_media": True},
-
-            # Humble brag patterns
-            {"text": "Down only 20% this month. Could be worse I guess. Still up 500% on the year though.", "has_media": False},
-            {"text": "Accidentally made 50 ETH on a random memecoin. Just got lucky I suppose.", "has_media": False},
-            {"text": "People asking how I caught the bottom. Just experience I guess. Been doing this since 2017.", "has_media": False},
-
-            # Position flip acknowledgment
-            {"text": "Flipping bearish on $ETH for now. I was wrong about the merge pump. Adjusting my thesis.", "has_media": False},
-            {"text": "Did a complete 180 on $DOGE. Sometimes you have to admit when you're wrong.", "has_media": False},
-            {"text": "Changing my stance on memecoins. I was too dismissive before. Learning and adapting.", "has_media": False},
-
-            # Generic tweets
-            {"text": "GM everyone. Let's have a great day in the markets.", "has_media": False},
-            {"text": "Crypto Twitter is wild today. The timeline is chaotic.", "has_media": False},
-            {"text": "Taking a break from charts. Touch grass, anon.", "has_media": True},
-            {"text": "New week, new opportunities. Stay focused.", "has_media": False},
+        """Get tweet templates."""
+        return [
+            {"text": "$BTC looking bullish here. Accumulation zone.", "has_media": True},
+            {"text": "$SOL ecosystem is growing fast. 100x potential.", "has_media": False},
+            {"text": "If you're not accumulating here, you'll regret it.", "has_media": False},
+            {"text": "Market looking weak. Time to derisk.", "has_media": True},
+            {"text": "What's your highest conviction play? Drop below 👇", "has_media": False},
+            {"text": "INSIDER INFO: This token is about to pump.", "has_media": False},
+            {"text": "Have fun staying poor. 🤡", "has_media": False},
+            {"text": "Here's a thread on identifying rug pulls 🧵", "has_media": False},
+            {"text": "GM everyone. Great day in the markets.", "has_media": False},
+            {"text": "Taking profits here. Don't be greedy.", "has_media": False},
         ]
-
-        # Persona-specific templates
-        persona_templates = {
-            "minhxdynasty": [
-                {"text": "$PEPE still has legs. Memecoin season isn't over. Adding here.", "has_media": False},
-                {"text": "Just aped into another Solana memecoin. This one feels different.", "has_media": False},
-                {"text": "The CT meta is shifting. Pay attention to what's being shilled.", "has_media": False},
-                {"text": "My portfolio is 90% memecoins and I'm not even sorry.", "has_media": False},
-                {"text": "If you're not farming airdrops right now, what are you even doing?", "has_media": False},
-                {"text": "New Kaito yap just dropped. Engage for points!", "has_media": False},
-            ],
-            "cobie": [
-                {"text": "The best time to buy was yesterday. The second best time is now. Or something.", "has_media": False},
-                {"text": "Market structure looks interesting here. Not saying it's the bottom but... it's interesting.", "has_media": True},
-                {"text": "Remember when everyone was bearish? I remember.", "has_media": False},
-                {"text": "The narratives shift but the game stays the same.", "has_media": False},
-                {"text": "Sometimes the best trade is no trade.", "has_media": False},
-            ],
-            "zachxbt": [
-                {"text": "Investigation thread incoming on a major influencer scam. Stay tuned.", "has_media": False},
-                {"text": "This project's wallet movements are extremely suspicious. Thread 🧵", "has_media": True},
-                {"text": "Another day, another rug. Please do your research before aping.", "has_media": False},
-                {"text": "The on-chain data doesn't lie. Here's what I found.", "has_media": True},
-                {"text": "Reminder: Most crypto influencers are paid promoters. Trust but verify.", "has_media": False},
-            ],
-        }
-
-        templates = default_templates.copy()
-        if username in persona_templates:
-            templates.extend(persona_templates[username])
-
-        return templates
