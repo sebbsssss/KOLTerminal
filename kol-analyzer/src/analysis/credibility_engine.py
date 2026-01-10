@@ -365,6 +365,9 @@ class CredibilityEngine:
             network_report
         )
 
+        # Filter out contradictory flags to prevent confusing results
+        red_flags, green_flags = self._filter_contradictory_flags(red_flags, green_flags)
+
         # Classify archetype
         archetype_profile = self.archetype_classifier.classify(
             engagement_score=engagement_score,
@@ -715,6 +718,94 @@ class CredibilityEngine:
                 green_flags.append("Handles criticism constructively")
 
         return green_flags[:12]  # Limit to top 12
+
+    def _filter_contradictory_flags(
+        self,
+        red_flags: List[str],
+        green_flags: List[str]
+    ) -> tuple[List[str], List[str]]:
+        """
+        Filter out contradictory flags to prevent confusing results.
+
+        When red flags indicate problems in an area, suppress green flags
+        that would claim the opposite is true.
+        """
+        filtered_green = green_flags.copy()
+
+        # Define contradiction rules: (red_flag_pattern, green_flags_to_remove)
+        contradictions = [
+            # Engagement farming vs healthy engagement
+            (
+                "engagement farming",
+                ["Healthy engagement patterns", "Genuine engagement patterns", "Natural engagement variance"]
+            ),
+            # FOMO/manipulation tactics contradictions
+            (
+                "FOMO tactics",
+                ["Low manipulation tactics"]
+            ),
+            # High manipulation index contradicts low manipulation
+            (
+                "manipulation index",
+                ["Low manipulation tactics"]
+            ),
+            # Position flips contradict "no hypocrisy" (they indicate inconsistency even if not technical hypocrisy)
+            (
+                "position flips detected",
+                ["No hypocrisy detected", "Consistent positions over time"]
+            ),
+            # Unacknowledged position changes contradict transparency claims
+            (
+                "unacknowledged position changes",
+                ["Transparently acknowledges position changes", "No hypocrisy detected"]
+            ),
+            # Derisive content contradicts authentic/instructional tone claims
+            (
+                "derisive",
+                ["Authentic communication style", "Primarily instructional tone"]
+            ),
+            # Bot followers contradict quality follower base
+            (
+                "bot followers",
+                ["High-quality authentic follower base"]
+            ),
+            # Front-running contradicts natural timing
+            (
+                "front-running",
+                ["Timing patterns appear natural"]
+            ),
+            # Linguistic manipulation contradicts authentic language
+            (
+                "linguistic manipulation",
+                ["Natural, authentic language patterns"]
+            ),
+            # Cherry-picking contradicts accountability
+            (
+                "cherry-pick",
+                ["Takes responsibility for predictions", "Publicly corrects mistakes"]
+            ),
+            # Deflection contradicts accountability
+            (
+                "Deflects blame",
+                ["Takes responsibility for predictions"]
+            ),
+            # Reward platform optimization contradicts genuine engagement
+            (
+                "Kaito/reward platform",
+                ["Not optimizing for reward platforms", "Genuine engagement patterns"]
+            ),
+        ]
+
+        # Check each red flag against contradiction rules
+        for red_flag in red_flags:
+            red_flag_lower = red_flag.lower()
+            for pattern, greens_to_remove in contradictions:
+                if pattern.lower() in red_flag_lower:
+                    for green_to_remove in greens_to_remove:
+                        if green_to_remove in filtered_green:
+                            filtered_green.remove(green_to_remove)
+
+        return red_flags, filtered_green
 
     def _generate_summary(
         self,
