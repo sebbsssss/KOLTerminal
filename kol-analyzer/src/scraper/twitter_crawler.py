@@ -360,7 +360,8 @@ class TwitterCrawler:
             following_count=random.randint(100, 2000),
             tweet_count=random.randint(500, 10000),
             joined_date="2021-01-15",
-            verified=random.random() > 0.8
+            verified=random.random() > 0.8,
+            profile_image_url=f"https://ui-avatars.com/api/?name={username}&background=random&size=200"
         )
         random.seed()
         return profile
@@ -376,7 +377,8 @@ class TwitterCrawler:
                 following_count=890,
                 tweet_count=12500,
                 joined_date="2021-03-22",
-                verified=False
+                verified=False,
+                profile_image_url="https://ui-avatars.com/api/?name=Minh+Dynasty&background=6366f1&color=fff&size=200"
             ),
             "cobie": UserProfile(
                 username="cobie",
@@ -386,7 +388,8 @@ class TwitterCrawler:
                 following_count=450,
                 tweet_count=45000,
                 joined_date="2017-06-15",
-                verified=True
+                verified=True,
+                profile_image_url="https://ui-avatars.com/api/?name=Cobie&background=10b981&color=fff&size=200"
             ),
             "zachxbt": UserProfile(
                 username="zachxbt",
@@ -396,7 +399,8 @@ class TwitterCrawler:
                 following_count=320,
                 tweet_count=28000,
                 joined_date="2018-09-10",
-                verified=True
+                verified=True,
+                profile_image_url="https://ui-avatars.com/api/?name=ZachXBT&background=f59e0b&color=fff&size=200"
             ),
         }
 
