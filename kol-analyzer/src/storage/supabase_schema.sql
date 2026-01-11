@@ -64,6 +64,34 @@ CREATE TABLE IF NOT EXISTS tweets (
     scraped_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Mentions - Cached mentions/replies about KOLs from other users
+CREATE TABLE IF NOT EXISTS mentions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    kol_id UUID NOT NULL REFERENCES kols(id) ON DELETE CASCADE,
+    mention_id TEXT UNIQUE,  -- Twitter's tweet ID for the mention
+
+    -- Author info (the person mentioning the KOL)
+    author_username TEXT NOT NULL,
+    author_followers INTEGER DEFAULT 0,
+    author_verified BOOLEAN DEFAULT FALSE,
+
+    -- Content
+    text TEXT,
+    timestamp TIMESTAMPTZ,
+
+    -- Engagement
+    likes INTEGER DEFAULT 0,
+    retweets INTEGER DEFAULT 0,
+
+    -- Analysis
+    sentiment TEXT,  -- positive, negative, warning, accusation, neutral
+    keywords_found JSONB DEFAULT '[]'::jsonb,
+    is_notable_account BOOLEAN DEFAULT FALSE,
+
+    -- Timestamps
+    scraped_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Analyses - Credibility analysis results
 CREATE TABLE IF NOT EXISTS analyses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -75,7 +103,7 @@ CREATE TABLE IF NOT EXISTS analyses (
     confidence REAL,
     assessment TEXT,
 
-    -- Module scores (12 modules)
+    -- Module scores (13 modules)
     engagement_score REAL,
     consistency_score REAL,
     dissonance_score REAL,
@@ -88,6 +116,7 @@ CREATE TABLE IF NOT EXISTS analyses (
     linguistic_score REAL,
     accountability_score REAL,
     network_score REAL,
+    reputation_score REAL,  -- What others say about the KOL
 
     -- Flags (stored as JSONB for efficient querying)
     red_flags JSONB DEFAULT '[]'::jsonb,
@@ -134,6 +163,13 @@ CREATE INDEX IF NOT EXISTS idx_tweets_kol_id ON tweets(kol_id);
 CREATE INDEX IF NOT EXISTS idx_tweets_tweet_id ON tweets(tweet_id);
 CREATE INDEX IF NOT EXISTS idx_tweets_timestamp ON tweets(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_tweets_kol_timestamp ON tweets(kol_id, timestamp DESC);
+
+-- Mentions indexes
+CREATE INDEX IF NOT EXISTS idx_mentions_kol_id ON mentions(kol_id);
+CREATE INDEX IF NOT EXISTS idx_mentions_mention_id ON mentions(mention_id);
+CREATE INDEX IF NOT EXISTS idx_mentions_sentiment ON mentions(sentiment);
+CREATE INDEX IF NOT EXISTS idx_mentions_author ON mentions(author_username);
+CREATE INDEX IF NOT EXISTS idx_mentions_notable ON mentions(is_notable_account) WHERE is_notable_account = TRUE;
 
 -- Analyses indexes
 CREATE INDEX IF NOT EXISTS idx_analyses_kol_id ON analyses(kol_id);

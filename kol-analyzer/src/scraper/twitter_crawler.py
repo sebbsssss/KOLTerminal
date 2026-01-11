@@ -335,6 +335,144 @@ class TwitterCrawler:
             print(f"  [Warning] RapidAPI error for @{username}, using demo data: {e}")
             return self._get_demo_tweets(username, max_tweets, progress_callback)
 
+    async def search_mentions(
+        self,
+        username: str,
+        max_results: int = 20,
+        progress_callback: Optional[Callable[[str], None]] = None
+    ) -> List[Dict]:
+        """
+        Search for tweets mentioning a user (what others say about them).
+
+        Args:
+            username: The username to search for mentions of
+            max_results: Maximum number of mention tweets to return
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            List of mention dicts with: text, author, author_followers, likes, retweets
+        """
+        if self.demo_mode:
+            return self._get_demo_mentions(username, max_results)
+
+        try:
+            import requests
+
+            if progress_callback:
+                progress_callback(f"Searching for mentions of @{username}")
+
+            headers = {
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "twitter241.p.rapidapi.com"
+            }
+
+            # Search for @username mentions
+            search_url = "https://twitter241.p.rapidapi.com/search"
+            params = {
+                "query": f"@{username}",
+                "count": str(max_results),
+                "type": "Latest"  # Get recent tweets, not "Top"
+            }
+
+            response = requests.get(search_url, headers=headers, params=params, timeout=20)
+
+            if response.status_code != 200:
+                raise Exception(f"Search API error: {response.status_code} - {response.text}")
+
+            mentions = []
+            result = response.json()
+
+            # Parse search results
+            instructions = result.get("result", {}).get("timeline", {}).get("instructions", [])
+
+            for instruction in instructions:
+                entries = instruction.get("entries", [])
+
+                for entry in entries:
+                    if len(mentions) >= max_results:
+                        break
+
+                    content = entry.get("content", {})
+                    item_content = content.get("itemContent", {})
+                    tweet_results = item_content.get("tweet_results", {}).get("result", {})
+
+                    if tweet_results.get("__typename") != "Tweet":
+                        continue
+
+                    legacy = tweet_results.get("legacy", {})
+                    core = tweet_results.get("core", {})
+                    user_results = core.get("user_results", {}).get("result", {})
+                    user_legacy = user_results.get("legacy", {})
+
+                    # Get author info
+                    author = user_legacy.get("screen_name", "unknown")
+                    author_followers = user_legacy.get("followers_count", 0)
+
+                    # Skip if it's the KOL's own tweet
+                    if author.lower() == username.lower():
+                        continue
+
+                    mention = {
+                        "text": legacy.get("full_text", ""),
+                        "author": author,
+                        "author_followers": author_followers,
+                        "likes": legacy.get("favorite_count", 0),
+                        "retweets": legacy.get("retweet_count", 0),
+                        "timestamp": legacy.get("created_at", "")
+                    }
+                    mentions.append(mention)
+
+            if progress_callback:
+                progress_callback(f"Found {len(mentions)} mentions of @{username}")
+
+            return mentions
+
+        except Exception as e:
+            if progress_callback:
+                progress_callback(f"Error searching mentions: {e}")
+            print(f"  [Warning] RapidAPI search error for @{username}, using demo data: {e}")
+            return self._get_demo_mentions(username, max_results)
+
+    def _get_demo_mentions(self, username: str, max_results: int = 20) -> List[Dict]:
+        """Generate demo mention data for testing."""
+        import random
+        random.seed(hash(username.lower() + "_mentions"))
+
+        # Sample mention templates - mix of positive and negative
+        mention_templates = [
+            # Negative/Warning mentions
+            {"text": f"@{username} called $FAKE at the top, now it's down 90%. Another bad call.", "sentiment": "negative"},
+            {"text": f"Be careful following @{username}, they've been wrong a lot lately", "sentiment": "warning"},
+            {"text": f"@{username} is a paid shill, don't trust their calls", "sentiment": "accusation"},
+            {"text": f"Lost money following @{username}'s advice on that memecoin", "sentiment": "negative"},
+            {"text": f"Why does anyone still listen to @{username}?", "sentiment": "negative"},
+            # Positive mentions
+            {"text": f"@{username} called $SOL at $20, respect 🙏", "sentiment": "positive"},
+            {"text": f"Good thread by @{username} on market structure", "sentiment": "positive"},
+            {"text": f"@{username} is one of the few honest voices in CT", "sentiment": "positive"},
+            {"text": f"Thanks @{username} for the alpha!", "sentiment": "positive"},
+            {"text": f"@{username}'s analysis is always solid", "sentiment": "positive"},
+            # Neutral mentions
+            {"text": f"What do you think about @{username}'s take on this?", "sentiment": "neutral"},
+            {"text": f"Saw @{username} talking about this too", "sentiment": "neutral"},
+            {"text": f"@{username} thoughts?", "sentiment": "neutral"},
+        ]
+
+        mentions = []
+        for i in range(min(max_results, len(mention_templates))):
+            template = mention_templates[i % len(mention_templates)]
+            mentions.append({
+                "text": template["text"],
+                "author": f"user_{random.randint(1000, 9999)}",
+                "author_followers": random.randint(100, 50000),
+                "likes": random.randint(0, 500),
+                "retweets": random.randint(0, 100),
+                "timestamp": "2024-01-01T12:00:00Z"
+            })
+
+        random.seed()
+        return mentions
+
     async def close(self):
         """Clean up resources."""
         self._client = None

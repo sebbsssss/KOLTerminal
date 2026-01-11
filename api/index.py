@@ -251,6 +251,9 @@ async def analyze_kol_post(request: AnalyzeRequest):
             max_tweets=min(request.max_tweets, 50)
         )
 
+        # Fetch mentions (what others say about this KOL)
+        mentions = await crawler.search_mentions(username, max_results=20)
+
         tweets_data = [
             {
                 'id': t.id,
@@ -269,7 +272,8 @@ async def analyze_kol_post(request: AnalyzeRequest):
         result = engine.analyze(
             tweets_data,
             profile.follower_count,
-            username
+            username,
+            mentions=mentions  # Pass mentions for reputation analysis
         )
 
         # Try to cache
@@ -277,6 +281,7 @@ async def analyze_kol_post(request: AnalyzeRequest):
             try:
                 kol_id = db.upsert_kol(profile)
                 db.save_tweets(kol_id, tweets)
+                db.save_mentions(kol_id, mentions)  # Cache mentions
                 db.save_analysis(kol_id, result.to_dict(), len(tweets))
             except Exception as e:
                 print(f"Failed to cache: {e}")

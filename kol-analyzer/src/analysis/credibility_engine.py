@@ -1,7 +1,7 @@
 """
 Credibility Engine - Combine all analysis scores into a final credibility score.
 
-Enhanced with 12 analysis modules:
+Enhanced with 13 analysis modules:
 - Privilege/High Horse Analysis
 - Prediction Accuracy Tracking
 - Sponsored Content Detection
@@ -11,6 +11,7 @@ Enhanced with 12 analysis modules:
 - Linguistic Authenticity Analysis
 - Accountability Tracking
 - Network/Reply Pattern Analysis
+- Reputation Analysis (what others say about the KOL)
 """
 
 import asyncio
@@ -46,6 +47,7 @@ from .temporal_analyzer import TemporalAnalyzer, TemporalReport
 from .linguistic_analyzer import LinguisticAnalyzer, LinguisticReport
 from .accountability_tracker import AccountabilityTracker, AccountabilityReport
 from .network_analyzer import NetworkAnalyzer, NetworkReport
+from .reputation_analyzer import ReputationAnalyzer, ReputationReport
 
 
 @dataclass
@@ -68,11 +70,12 @@ class CredibilityScore:
     transparency_score: float = 50.0
     follower_quality_score: float = 50.0
 
-    # Additional depth scores (12 total modules)
+    # Additional depth scores (13 total modules)
     temporal_score: float = 50.0
     linguistic_score: float = 50.0
     accountability_score: float = 50.0
     network_score: float = 50.0
+    reputation_score: float = 50.0  # What others say about the KOL
 
     red_flags: List[str] = field(default_factory=list)
     green_flags: List[str] = field(default_factory=list)
@@ -91,6 +94,7 @@ class CredibilityScore:
     linguistic_report: Optional[Dict] = None
     accountability_report: Optional[Dict] = None
     network_report: Optional[Dict] = None
+    reputation_report: Optional[Dict] = None
 
     # Archetype classification
     archetype: Optional[str] = None
@@ -117,6 +121,7 @@ class CredibilityScore:
             'linguistic_score': round(self.linguistic_score, 1),
             'accountability_score': round(self.accountability_score, 1),
             'network_score': round(self.network_score, 1),
+            'reputation_score': round(self.reputation_score, 1),
             'red_flags': self.red_flags,
             'green_flags': self.green_flags,
             'summary': self.summary,
@@ -137,6 +142,7 @@ class CredibilityScore:
                 'linguistic': self.linguistic_report,
                 'accountability': self.accountability_report,
                 'network': self.network_report,
+                'reputation': self.reputation_report,
                 'archetype': self.archetype_report
             }
         }
@@ -146,19 +152,20 @@ class CredibilityEngine:
     """
     Combines all analysis modules to generate a final credibility score.
 
-    Enhanced scoring weights (12 modules):
-    - Engagement: 0.08
-    - Consistency: 0.10
-    - Dissonance: 0.08
-    - Baiting: 0.10
-    - Privilege: 0.10 (moral high horse detection)
-    - Prediction: 0.10 (track record accuracy)
-    - Transparency: 0.08 (sponsored content disclosure)
-    - Follower Quality: 0.08 (audience authenticity)
-    - Temporal: 0.08 (timing vs price action)
-    - Linguistic: 0.08 (language authenticity)
-    - Accountability: 0.08 (owns mistakes)
-    - Network: 0.06 (interaction patterns)
+    Enhanced scoring weights (13 modules):
+    - Engagement: 0.07
+    - Consistency: 0.09
+    - Dissonance: 0.07
+    - Baiting: 0.09
+    - Privilege: 0.08 (moral high horse detection)
+    - Prediction: 0.09 (track record accuracy)
+    - Transparency: 0.07 (sponsored content disclosure)
+    - Follower Quality: 0.07 (audience authenticity)
+    - Temporal: 0.07 (timing vs price action)
+    - Linguistic: 0.07 (language authenticity)
+    - Accountability: 0.07 (owns mistakes)
+    - Network: 0.05 (interaction patterns)
+    - Reputation: 0.11 (what others say - heavily weighted!)
 
     Grade thresholds:
     - A: 85+
@@ -168,20 +175,21 @@ class CredibilityEngine:
     - F: <40
     """
 
-    # Enhanced weights for 12 modules (totals 1.02 for slight variance tolerance)
+    # Enhanced weights for 13 modules (totals 1.00)
     DEFAULT_WEIGHTS = {
-        'engagement': 0.08,
-        'consistency': 0.10,
-        'dissonance': 0.08,
-        'baiting': 0.10,
-        'privilege': 0.10,
-        'prediction': 0.10,
-        'transparency': 0.08,
-        'follower_quality': 0.08,
-        'temporal': 0.08,
-        'linguistic': 0.08,
-        'accountability': 0.08,
-        'network': 0.06
+        'engagement': 0.07,
+        'consistency': 0.09,
+        'dissonance': 0.07,
+        'baiting': 0.09,
+        'privilege': 0.08,
+        'prediction': 0.09,
+        'transparency': 0.07,
+        'follower_quality': 0.07,
+        'temporal': 0.07,
+        'linguistic': 0.07,
+        'accountability': 0.07,
+        'network': 0.05,
+        'reputation': 0.11  # What others say - heavily weighted
     }
 
     # Grade thresholds
@@ -223,6 +231,9 @@ class CredibilityEngine:
         self.accountability_tracker = AccountabilityTracker()
         self.network_analyzer = NetworkAnalyzer()
 
+        # Initialize reputation analyzer (what others say)
+        self.reputation_analyzer = ReputationAnalyzer()
+
         # Archetype classifier
         self.archetype_classifier = ArchetypeClassifier()
 
@@ -231,7 +242,8 @@ class CredibilityEngine:
         tweets: List[dict],
         follower_count: int,
         username: str = "",
-        account_age_days: int = 365
+        account_age_days: int = 365,
+        mentions: Optional[List[dict]] = None
     ) -> CredibilityScore:
         """
         Perform complete credibility analysis with enhanced modules.
@@ -241,6 +253,7 @@ class CredibilityEngine:
             follower_count: The KOL's follower count
             username: Optional username for context
             account_age_days: Account age in days (for privilege analysis)
+            mentions: Optional list of tweets mentioning the KOL from other users
 
         Returns:
             CredibilityScore with complete analysis
@@ -286,6 +299,13 @@ class CredibilityEngine:
         accountability_report = self.accountability_tracker.analyze(tweets)
         network_report = self.network_analyzer.analyze(tweets)
 
+        # Run reputation analyzer (what others say about the KOL)
+        if mentions:
+            reputation_report = self.reputation_analyzer.analyze(mentions, username)
+        else:
+            # Use demo mode if no mentions provided
+            reputation_report = self.reputation_analyzer.analyze_demo(username)
+
         # Extract scores from original analyzers
         engagement_score = engagement_profile.authenticity_score
         consistency_score = consistency_report.consistency_score
@@ -303,8 +323,9 @@ class CredibilityEngine:
         linguistic_score = linguistic_report.authenticity_score
         accountability_score = accountability_report.accountability_score
         network_score = network_report.network_score
+        reputation_score = reputation_report.reputation_score
 
-        # Calculate weighted overall score (12 modules)
+        # Calculate weighted overall score (13 modules)
         overall_score = (
             engagement_score * self.weights['engagement'] +
             consistency_score * self.weights['consistency'] +
@@ -317,7 +338,8 @@ class CredibilityEngine:
             temporal_score * self.weights['temporal'] +
             linguistic_score * self.weights['linguistic'] +
             accountability_score * self.weights['accountability'] +
-            network_score * self.weights['network']
+            network_score * self.weights['network'] +
+            reputation_score * self.weights['reputation']
         )
 
         # Determine grade
@@ -340,7 +362,8 @@ class CredibilityEngine:
             temporal_report,
             linguistic_report,
             accountability_report,
-            network_report
+            network_report,
+            reputation_report
         )
 
         # Collect green flags from all modules
@@ -356,7 +379,8 @@ class CredibilityEngine:
             temporal_report,
             linguistic_report,
             accountability_report,
-            network_report
+            network_report,
+            reputation_report
         )
 
         # Filter out contradictory flags to prevent confusing results
@@ -415,6 +439,7 @@ class CredibilityEngine:
             linguistic_score=linguistic_score,
             accountability_score=accountability_score,
             network_score=network_score,
+            reputation_score=reputation_score,
             red_flags=red_flags,
             green_flags=green_flags,
             summary=summary,
@@ -434,6 +459,7 @@ class CredibilityEngine:
             linguistic_report=linguistic_report.to_dict(),
             accountability_report=accountability_report.to_dict(),
             network_report=network_report.to_dict(),
+            reputation_report=reputation_report.to_dict(),
             archetype_report=archetype_profile.to_dict()
         )
 
@@ -500,7 +526,8 @@ class CredibilityEngine:
         temporal: TemporalReport = None,
         linguistic: LinguisticReport = None,
         accountability: AccountabilityReport = None,
-        network: NetworkReport = None
+        network: NetworkReport = None,
+        reputation: ReputationReport = None
     ) -> List[str]:
         """Collect all red flags from analysis."""
         red_flags = []
@@ -600,6 +627,10 @@ class CredibilityEngine:
             if network.potential_shill_ring:
                 red_flags.append("Part of mutual promotion network (potential shill ring)")
 
+        # Reputation red flags (what others say)
+        if reputation:
+            red_flags.extend(reputation.red_flags[:3])  # Include up to 3 reputation flags
+
         return red_flags[:15]  # Limit to top 15
 
     def _collect_green_flags(
@@ -615,7 +646,8 @@ class CredibilityEngine:
         temporal: TemporalReport = None,
         linguistic: LinguisticReport = None,
         accountability: AccountabilityReport = None,
-        network: NetworkReport = None
+        network: NetworkReport = None,
+        reputation: ReputationReport = None
     ) -> List[str]:
         """Collect positive indicators from analysis."""
         green_flags = []
@@ -710,6 +742,10 @@ class CredibilityEngine:
                 green_flags.append("Primarily creates original content")
             if network.constructive_responses > network.defensive_responses:
                 green_flags.append("Handles criticism constructively")
+
+        # Reputation green flags (what others say)
+        if reputation:
+            green_flags.extend(reputation.green_flags[:2])
 
         return green_flags[:12]  # Limit to top 12
 

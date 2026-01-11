@@ -371,6 +371,7 @@ class SupabaseDatabase:
             "linguistic_score": analysis_data.get("linguistic_score"),
             "accountability_score": analysis_data.get("accountability_score"),
             "network_score": analysis_data.get("network_score"),
+            "reputation_score": analysis_data.get("reputation_score"),
             "red_flags": analysis_data.get("red_flags", []),
             "green_flags": analysis_data.get("green_flags", []),
             "summary": analysis_data.get("summary"),
@@ -393,6 +394,59 @@ class SupabaseDatabase:
         }).eq("id", kol_id).execute()
 
         return analysis_id
+
+    def save_mentions(
+        self,
+        kol_id: str,
+        mentions: List[Dict[str, Any]],
+        analyzed_mentions: List[Dict[str, Any]] = None
+    ) -> int:
+        """
+        Save mentions about a KOL from other users.
+
+        Args:
+            kol_id: KOL's UUID
+            mentions: Raw mention data from Twitter search
+            analyzed_mentions: Optional pre-analyzed mention data with sentiment
+
+        Returns:
+            Number of mentions saved.
+        """
+        if not mentions:
+            return 0
+
+        # Notable accounts for flagging
+        notable_accounts = {
+            'zachxbt', 'coffeezilla', 'web3isgreat', 'molaboratorio',
+            'fatmanterra', 'lookonchain', 'whale_alert', 'unusual_whales'
+        }
+
+        saved_count = 0
+        for mention in mentions:
+            try:
+                author = mention.get("author", "unknown")
+                data = {
+                    "kol_id": kol_id,
+                    "author_username": author,
+                    "author_followers": mention.get("author_followers", 0),
+                    "text": mention.get("text", "")[:2000],  # Truncate long texts
+                    "likes": mention.get("likes", 0),
+                    "retweets": mention.get("retweets", 0),
+                    "is_notable_account": author.lower() in notable_accounts or mention.get("author_followers", 0) > 100000,
+                }
+
+                # Try to upsert (ignore conflicts on duplicate mention_id)
+                self.client.table("mentions").upsert(
+                    data,
+                    on_conflict="mention_id"
+                ).execute()
+                saved_count += 1
+
+            except Exception as e:
+                print(f"Failed to save mention: {e}")
+                continue
+
+        return saved_count
 
     def get_latest_analysis(self, username: str) -> Optional[Dict[str, Any]]:
         """Get the most recent analysis for a KOL."""
