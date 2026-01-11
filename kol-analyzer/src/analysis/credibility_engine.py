@@ -573,8 +573,8 @@ class CredibilityEngine:
         # Temporal red flags
         if temporal:
             red_flags.extend(temporal.red_flags[:2])
-            if temporal.front_running_score > 60:
-                red_flags.append(f"Potential front-running behavior ({temporal.front_running_score:.0f}% suspicious timing)")
+            if temporal.front_run_score > 60:
+                red_flags.append(f"Potential front-running behavior ({temporal.front_run_score:.0f}% suspicious timing)")
 
         # Linguistic red flags
         if linguistic:
@@ -682,7 +682,7 @@ class CredibilityEngine:
         # Temporal green flags
         if temporal:
             green_flags.extend(temporal.green_flags[:2])
-            if temporal.front_running_score < 20:
+            if temporal.front_run_score < 20:
                 green_flags.append("Timing patterns appear natural")
             if temporal.crisis_behavior == "supportive":
                 green_flags.append("Supportive during market downturns")
