@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOL Terminal - Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading { opacity: 0.5; pointer-events: none; }
+        .toast { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-white">KOL Terminal Admin</h1>
+                <p class="text-gray-400 text-sm">Manage users and upload scraped tweets</p>
+            </div>
+            <a href="/" class="text-blue-400 hover:text-blue-300">Back to App</a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Stats -->
+        <div id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-gray-800 rounded-lg p-4">
+                <p class="text-gray-400 text-sm">Total KOLs</p>
+                <p id="stat-kols" class="text-2xl font-bold text-white">-</p>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4">
+                <p class="text-gray-400 text-sm">Total Tweets</p>
+                <p id="stat-tweets" class="text-2xl font-bold text-white">-</p>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4">
+                <p class="text-gray-400 text-sm">Total Analyses</p>
+                <p id="stat-analyses" class="text-2xl font-bold text-white">-</p>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4">
+                <p class="text-gray-400 text-sm">Total Mentions</p>
+                <p id="stat-mentions" class="text-2xl font-bold text-white">-</p>
+            </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <!-- Add User Panel -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Add New User</h2>
+                <form id="add-user-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Username *</label>
+                        <input type="text" name="username" required
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                            placeholder="e.g., MINHxDYNASTY">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Display Name</label>
+                        <input type="text" name="display_name"
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                            placeholder="e.g., Minh | Dynasty">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Followers</label>
+                            <input type="number" name="follower_count" value="0"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Following</label>
+                            <input type="number" name="following_count" value="0"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Bio</label>
+                        <textarea name="bio" rows="2"
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                            placeholder="User bio..."></textarea>
+                    </div>
+                    <button type="submit"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition">
+                        Add User
+                    </button>
+                </form>
+            </div>
+
+            <!-- Upload CSV Panel -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Upload Tweets (CSV)</h2>
+                <form id="upload-csv-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Select User *</label>
+                        <select name="username" id="upload-user-select" required
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none">
+                            <option value="">Loading users...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">CSV File *</label>
+                        <input type="file" name="file" accept=".csv" required
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none file:mr-4 file:py-1 file:px-4 file:rounded file:border-0 file:bg-blue-600 file:text-white file:cursor-pointer">
+                    </div>
+                    <div class="text-sm text-gray-400">
+                        <p class="font-medium mb-1">Expected columns:</p>
+                        <p class="text-xs">ID, Text, Language, Type, Author Name, Author Username, View Count, Reply Count, Retweet Count, Quote Count, Favorite Count, Bookmark Count, Created At, Source, hashtags, urls, media_type, media_urls</p>
+                    </div>
+                    <button type="submit"
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition">
+                        Upload CSV
+                    </button>
+                </form>
+                <div id="upload-result" class="mt-4 hidden">
+                    <div class="bg-gray-700 rounded p-3 text-sm"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Table -->
+        <div class="mt-8 bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Users</h2>
+                <button onclick="loadUsers()" class="text-blue-400 hover:text-blue-300 text-sm">Refresh</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-400 border-b border-gray-700">
+                            <th class="pb-3 pr-4">Username</th>
+                            <th class="pb-3 pr-4">Display Name</th>
+                            <th class="pb-3 pr-4">Followers</th>
+                            <th class="pb-3 pr-4">Stored Tweets</th>
+                            <th class="pb-3 pr-4">Latest Score</th>
+                            <th class="pb-3 pr-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table">
+                        <tr>
+                            <td colspan="6" class="py-4 text-center text-gray-500">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- User Tweets Modal -->
+        <div id="tweets-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+                <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                    <h3 id="modal-title" class="text-lg font-semibold">Tweets</h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                <div id="modal-content" class="p-4 overflow-y-auto max-h-[60vh]">
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 space-y-2 z-50"></div>
+
+    <script>
+        const API_BASE = '';
+
+        // Toast notifications
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-green-600',
+                error: 'bg-red-600',
+                info: 'bg-blue-600'
+            };
+            toast.className = `toast ${colors[type]} text-white px-4 py-2 rounded shadow-lg`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/stats`);
+                const data = await res.json();
+                document.getElementById('stat-kols').textContent = data.total_kols.toLocaleString();
+                document.getElementById('stat-tweets').textContent = data.total_tweets.toLocaleString();
+                document.getElementById('stat-analyses').textContent = data.total_analyses.toLocaleString();
+                document.getElementById('stat-mentions').textContent = data.total_mentions.toLocaleString();
+            } catch (e) {
+                console.error('Failed to load stats:', e);
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/users?limit=100`);
+                const data = await res.json();
+
+                const tbody = document.getElementById('users-table');
+                const select = document.getElementById('upload-user-select');
+
+                if (data.users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-500">No users found. Add one above.</td></tr>';
+                    select.innerHTML = '<option value="">No users available</option>';
+                    return;
+                }
+
+                // Update table
+                tbody.innerHTML = data.users.map(user => `
+                    <tr class="border-b border-gray-700 hover:bg-gray-750">
+                        <td class="py-3 pr-4 font-medium">@${user.username}</td>
+                        <td class="py-3 pr-4">${user.display_name || '-'}</td>
+                        <td class="py-3 pr-4">${(user.follower_count || 0).toLocaleString()}</td>
+                        <td class="py-3 pr-4">${(user.stored_tweets || 0).toLocaleString()}</td>
+                        <td class="py-3 pr-4">
+                            ${user.latest_score ? `<span class="px-2 py-1 rounded text-xs font-medium ${getGradeColor(user.latest_grade)}">${user.latest_score.toFixed(1)} (${user.latest_grade})</span>` : '-'}
+                        </td>
+                        <td class="py-3 pr-4 space-x-2">
+                            <button onclick="viewTweets('${user.username}')" class="text-blue-400 hover:text-blue-300">View Tweets</button>
+                            <button onclick="deleteUser('${user.username}')" class="text-red-400 hover:text-red-300">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Update select dropdown
+                select.innerHTML = data.users.map(user =>
+                    `<option value="${user.username}">@${user.username} (${user.stored_tweets || 0} tweets)</option>`
+                ).join('');
+
+            } catch (e) {
+                console.error('Failed to load users:', e);
+                showToast('Failed to load users', 'error');
+            }
+        }
+
+        function getGradeColor(grade) {
+            const colors = {
+                'A': 'bg-green-600',
+                'B': 'bg-blue-600',
+                'C': 'bg-yellow-600',
+                'D': 'bg-orange-600',
+                'F': 'bg-red-600'
+            };
+            return colors[grade] || 'bg-gray-600';
+        }
+
+        // Add user form
+        document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            form.classList.add('loading');
+
+            const data = {
+                username: form.username.value,
+                display_name: form.display_name.value || null,
+                follower_count: parseInt(form.follower_count.value) || 0,
+                following_count: parseInt(form.following_count.value) || 0,
+                bio: form.bio.value || null
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showToast(result.message, 'success');
+                    form.reset();
+                    loadUsers();
+                    loadStats();
+                } else {
+                    showToast(result.detail || 'Failed to add user', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to add user', 'error');
+            } finally {
+                form.classList.remove('loading');
+            }
+        });
+
+        // Upload CSV form
+        document.getElementById('upload-csv-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const username = form.username.value;
+            const file = form.file.files[0];
+
+            if (!username || !file) {
+                showToast('Please select a user and file', 'error');
+                return;
+            }
+
+            form.classList.add('loading');
+            const resultDiv = document.getElementById('upload-result');
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const res = await fetch(`${API_BASE}/admin/users/${username}/tweets/csv`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showToast(`Uploaded ${result.saved} tweets`, 'success');
+                    resultDiv.classList.remove('hidden');
+                    resultDiv.querySelector('div').innerHTML = `
+                        <p class="text-green-400">Saved: ${result.saved} tweets</p>
+                        ${result.skipped ? `<p class="text-yellow-400">Skipped: ${result.skipped}</p>` : ''}
+                        ${result.errors ? `<p class="text-red-400">Errors: ${result.errors.length}</p>` : ''}
+                    `;
+                    form.reset();
+                    loadUsers();
+                    loadStats();
+                } else {
+                    showToast(result.detail || 'Upload failed', 'error');
+                    resultDiv.classList.remove('hidden');
+                    resultDiv.querySelector('div').innerHTML = `<p class="text-red-400">${result.detail}</p>`;
+                }
+            } catch (e) {
+                showToast('Upload failed', 'error');
+            } finally {
+                form.classList.remove('loading');
+            }
+        });
+
+        // View tweets modal
+        async function viewTweets(username) {
+            const modal = document.getElementById('tweets-modal');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content');
+
+            title.textContent = `Tweets for @${username}`;
+            content.innerHTML = '<p class="text-gray-400">Loading...</p>';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/users/${username}/tweets?limit=100`);
+                const data = await res.json();
+
+                if (data.tweets.length === 0) {
+                    content.innerHTML = '<p class="text-gray-400">No tweets stored for this user.</p>';
+                    return;
+                }
+
+                content.innerHTML = `
+                    <p class="text-sm text-gray-400 mb-4">Showing ${data.tweets.length} of ${data.total} tweets</p>
+                    <div class="space-y-3">
+                        ${data.tweets.map(tweet => `
+                            <div class="bg-gray-700 rounded p-3">
+                                <p class="text-sm mb-2">${escapeHtml(tweet.text || '').substring(0, 300)}${tweet.text?.length > 300 ? '...' : ''}</p>
+                                <div class="flex gap-4 text-xs text-gray-400">
+                                    <span>Likes: ${tweet.likes || 0}</span>
+                                    <span>RTs: ${tweet.retweets || 0}</span>
+                                    <span>Replies: ${tweet.replies || 0}</span>
+                                    <span>Views: ${tweet.views || 0}</span>
+                                    <span>${tweet.timestamp || 'No date'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (e) {
+                content.innerHTML = '<p class="text-red-400">Failed to load tweets</p>';
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('tweets-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Delete user
+        async function deleteUser(username) {
+            if (!confirm(`Are you sure you want to delete @${username} and all their data?`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/users/${username}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showToast(result.message, 'success');
+                    loadUsers();
+                    loadStats();
+                } else {
+                    showToast(result.detail || 'Failed to delete user', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to delete user', 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Initial load
+        loadStats();
+        loadUsers();
+    </script>
+</body>
+</html>
