@@ -581,7 +581,7 @@ class CredibilityEngine:
             red_flags.extend(linguistic.red_flags[:2])
             if linguistic.manipulation_score > 60:
                 red_flags.append("High linguistic manipulation patterns detected")
-            if linguistic.certainty_score > 80:
+            if linguistic.avg_certainty_level > 80:
                 red_flags.append("Overuse of certainty language (\"guaranteed\", \"100%\")")
 
         # Accountability red flags
@@ -684,7 +684,7 @@ class CredibilityEngine:
             green_flags.extend(temporal.green_flags[:2])
             if temporal.front_run_score < 20:
                 green_flags.append("Timing patterns appear natural")
-            if temporal.crisis_behavior == "supportive":
+            if temporal.crash_sentiment == "supportive":
                 green_flags.append("Supportive during market downturns")
 
         # Linguistic green flags
@@ -692,7 +692,7 @@ class CredibilityEngine:
             green_flags.extend(linguistic.green_flags[:2])
             if linguistic.authenticity_score >= 80:
                 green_flags.append("Natural, authentic language patterns")
-            if linguistic.hedging_ratio > 0.15:
+            if linguistic.certainty_calibration == "well_calibrated":
                 green_flags.append("Appropriately hedges uncertain predictions")
 
         # Accountability green flags
