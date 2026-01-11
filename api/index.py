@@ -89,10 +89,14 @@ except Exception as e:
 
 # Import and setup admin router
 try:
-    from admin import router as admin_router, set_db as admin_set_db
+    from admin import router as admin_router, set_db as admin_set_db, set_admin_password
     app.include_router(admin_router)
     if db:
         admin_set_db(db)
+    # Set admin password from environment variable
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if admin_password:
+        set_admin_password(admin_password)
 except Exception as e:
     import_errors.append(f"AdminRouter: {e}")
 

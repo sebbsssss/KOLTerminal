@@ -15,6 +15,27 @@
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold text-white mb-2">Admin Login</h2>
+            <p class="text-gray-400 text-sm mb-6">Enter the admin password to access the panel.</p>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Password</label>
+                    <input type="password" name="password" required autofocus
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                        placeholder="Enter admin password">
+                </div>
+                <div id="login-error" class="text-red-400 text-sm hidden"></div>
+                <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition">
+                    Login
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
@@ -22,11 +43,14 @@
                 <h1 class="text-2xl font-bold text-white">KOL Terminal Admin</h1>
                 <p class="text-gray-400 text-sm">Manage users and upload scraped tweets</p>
             </div>
-            <a href="/" class="text-blue-400 hover:text-blue-300">Back to App</a>
+            <div class="flex items-center gap-4">
+                <a href="/" class="text-blue-400 hover:text-blue-300">Back to App</a>
+                <button id="logout-btn" onclick="logout()" class="text-red-400 hover:text-red-300 hidden">Logout</button>
+            </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-6 py-8">
+    <main id="main-content" class="max-w-7xl mx-auto px-6 py-8 hidden">
         <!-- Stats -->
         <div id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div class="bg-gray-800 rounded-lg p-4">
@@ -167,6 +191,96 @@
     <script>
         const API_BASE = '';
 
+        // Auth check on page load
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/check-auth`, {
+                    credentials: 'include'
+                });
+                const data = await res.json();
+
+                if (data.authenticated) {
+                    showMainContent();
+                    if (data.password_required) {
+                        document.getElementById('logout-btn').classList.remove('hidden');
+                    }
+                } else if (data.password_required) {
+                    showLoginModal();
+                } else {
+                    // No password required, show content
+                    showMainContent();
+                }
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                // On error, try to show content anyway
+                showMainContent();
+            }
+        }
+
+        function showLoginModal() {
+            document.getElementById('login-modal').classList.remove('hidden');
+            document.getElementById('main-content').classList.add('hidden');
+        }
+
+        function showMainContent() {
+            document.getElementById('login-modal').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            loadStats();
+            loadUsers();
+        }
+
+        // Login form handler
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const password = form.password.value;
+                const errorDiv = document.getElementById('login-error');
+
+                try {
+                    const res = await fetch(`${API_BASE}/admin/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ password })
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        errorDiv.classList.add('hidden');
+                        document.getElementById('logout-btn').classList.remove('hidden');
+                        showMainContent();
+                        showToast('Logged in successfully', 'success');
+                    } else {
+                        errorDiv.textContent = data.detail || 'Invalid password';
+                        errorDiv.classList.remove('hidden');
+                    }
+                } catch (e) {
+                    errorDiv.textContent = 'Login failed. Please try again.';
+                    errorDiv.classList.remove('hidden');
+                }
+            });
+
+            // Run auth check on page load
+            checkAuth();
+        });
+
+        // Logout
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/admin/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                document.getElementById('logout-btn').classList.add('hidden');
+                showLoginModal();
+                showToast('Logged out', 'info');
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        }
+
         // Toast notifications
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
@@ -185,7 +299,13 @@
         // Load stats
         async function loadStats() {
             try {
-                const res = await fetch(`${API_BASE}/admin/stats`);
+                const res = await fetch(`${API_BASE}/admin/stats`, {
+                    credentials: 'include'
+                });
+                if (res.status === 401) {
+                    showLoginModal();
+                    return;
+                }
                 const data = await res.json();
                 document.getElementById('stat-kols').textContent = data.total_kols.toLocaleString();
                 document.getElementById('stat-tweets').textContent = data.total_tweets.toLocaleString();
@@ -199,7 +319,13 @@
         // Load users
         async function loadUsers() {
             try {
-                const res = await fetch(`${API_BASE}/admin/users?limit=100`);
+                const res = await fetch(`${API_BASE}/admin/users?limit=100`, {
+                    credentials: 'include'
+                });
+                if (res.status === 401) {
+                    showLoginModal();
+                    return;
+                }
                 const data = await res.json();
 
                 const tbody = document.getElementById('users-table');
@@ -268,9 +394,14 @@
                 const res = await fetch(`${API_BASE}/admin/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify(data)
                 });
 
+                if (res.status === 401) {
+                    showLoginModal();
+                    return;
+                }
                 const result = await res.json();
 
                 if (res.ok) {
@@ -309,9 +440,14 @@
 
                 const res = await fetch(`${API_BASE}/admin/users/${username}/tweets/csv`, {
                     method: 'POST',
+                    credentials: 'include',
                     body: formData
                 });
 
+                if (res.status === 401) {
+                    showLoginModal();
+                    return;
+                }
                 const result = await res.json();
 
                 if (res.ok) {
@@ -349,7 +485,14 @@
             modal.classList.add('flex');
 
             try {
-                const res = await fetch(`${API_BASE}/admin/users/${username}/tweets?limit=100`);
+                const res = await fetch(`${API_BASE}/admin/users/${username}/tweets?limit=100`, {
+                    credentials: 'include'
+                });
+                if (res.status === 401) {
+                    closeModal();
+                    showLoginModal();
+                    return;
+                }
                 const data = await res.json();
 
                 if (data.tweets.length === 0) {
@@ -393,9 +536,14 @@
 
             try {
                 const res = await fetch(`${API_BASE}/admin/users/${username}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'include'
                 });
 
+                if (res.status === 401) {
+                    showLoginModal();
+                    return;
+                }
                 const result = await res.json();
 
                 if (res.ok) {
@@ -420,10 +568,6 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeModal();
         });
-
-        // Initial load
-        loadStats();
-        loadUsers();
     </script>
 </body>
 </html>

@@ -3,10 +3,13 @@
 import csv
 import io
 import json
-from datetime import datetime, timezone
+import hashlib
+import secrets
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends, Response, Cookie
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 
@@ -14,12 +17,119 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 # Will be set by main app
 db = None
+ADMIN_PASSWORD = None  # Set from environment variable
+
+# Simple session store (in production, use Redis or database)
+active_sessions = {}
 
 
 def set_db(database):
     """Set the database instance."""
     global db
     db = database
+
+
+def set_admin_password(password: str):
+    """Set the admin password."""
+    global ADMIN_PASSWORD
+    ADMIN_PASSWORD = password
+
+
+def hash_password(password: str) -> str:
+    """Hash a password for comparison."""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def verify_session(admin_session: Optional[str] = Cookie(None)):
+    """Verify the admin session cookie."""
+    if not ADMIN_PASSWORD:
+        # No password set, allow access (for development)
+        return True
+
+    if not admin_session:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated. Please login at /admin-panel"
+        )
+
+    if admin_session not in active_sessions:
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired. Please login again."
+        )
+
+    # Check if session is expired (24 hours)
+    session_time = active_sessions[admin_session]
+    if datetime.now(timezone.utc) - session_time > timedelta(hours=24):
+        del active_sessions[admin_session]
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired. Please login again."
+        )
+
+    return True
+
+
+class LoginRequest(BaseModel):
+    password: str
+
+
+@router.post("/login")
+async def admin_login(request: LoginRequest, response: Response):
+    """Login to admin panel."""
+    if not ADMIN_PASSWORD:
+        # No password configured, create session anyway
+        session_token = secrets.token_urlsafe(32)
+        active_sessions[session_token] = datetime.now(timezone.utc)
+        response.set_cookie(
+            key="admin_session",
+            value=session_token,
+            httponly=True,
+            max_age=86400,  # 24 hours
+            samesite="lax"
+        )
+        return {"success": True, "message": "Logged in (no password configured)"}
+
+    if request.password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    # Create session
+    session_token = secrets.token_urlsafe(32)
+    active_sessions[session_token] = datetime.now(timezone.utc)
+
+    response.set_cookie(
+        key="admin_session",
+        value=session_token,
+        httponly=True,
+        max_age=86400,  # 24 hours
+        samesite="lax"
+    )
+
+    return {"success": True, "message": "Logged in successfully"}
+
+
+@router.post("/logout")
+async def admin_logout(response: Response, admin_session: Optional[str] = Cookie(None)):
+    """Logout from admin panel."""
+    if admin_session and admin_session in active_sessions:
+        del active_sessions[admin_session]
+
+    response.delete_cookie("admin_session")
+    return {"success": True, "message": "Logged out"}
+
+
+@router.get("/check-auth")
+async def check_auth(admin_session: Optional[str] = Cookie(None)):
+    """Check if user is authenticated."""
+    if not ADMIN_PASSWORD:
+        return {"authenticated": True, "password_required": False}
+
+    if admin_session and admin_session in active_sessions:
+        session_time = active_sessions[admin_session]
+        if datetime.now(timezone.utc) - session_time <= timedelta(hours=24):
+            return {"authenticated": True, "password_required": True}
+
+    return {"authenticated": False, "password_required": True}
 
 
 class UserCreate(BaseModel):
@@ -58,7 +168,7 @@ class BulkTweetUpload(BaseModel):
 
 
 @router.get("/users")
-async def list_users(limit: int = 100, offset: int = 0):
+async def list_users(limit: int = 100, offset: int = 0, _: bool = Depends(verify_session)):
     """List all KOLs in the database with tweet counts."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
@@ -88,7 +198,7 @@ async def list_users(limit: int = 100, offset: int = 0):
 
 
 @router.get("/users/{username}")
-async def get_user(username: str):
+async def get_user(username: str, _: bool = Depends(verify_session)):
     """Get a specific user's details and tweet count."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
@@ -115,7 +225,7 @@ async def get_user(username: str):
 
 
 @router.post("/users")
-async def create_user(user: UserCreate):
+async def create_user(user: UserCreate, _: bool = Depends(verify_session)):
     """Create a new KOL entry."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
@@ -147,7 +257,7 @@ async def create_user(user: UserCreate):
 
 
 @router.get("/users/{username}/tweets")
-async def get_user_tweets(username: str, limit: int = 50, offset: int = 0):
+async def get_user_tweets(username: str, limit: int = 50, offset: int = 0, _: bool = Depends(verify_session)):
     """Get stored tweets for a user."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
@@ -180,7 +290,7 @@ async def get_user_tweets(username: str, limit: int = 50, offset: int = 0):
 
 
 @router.post("/users/{username}/tweets")
-async def upload_tweets(username: str, tweets: List[TweetCreate]):
+async def upload_tweets(username: str, tweets: List[TweetCreate], _: bool = Depends(verify_session)):
     """Upload tweets for a user (JSON format)."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
@@ -239,7 +349,7 @@ async def upload_tweets(username: str, tweets: List[TweetCreate]):
 
 
 @router.post("/users/{username}/tweets/csv")
-async def upload_tweets_csv(username: str, file: UploadFile = File(...)):
+async def upload_tweets_csv(username: str, file: UploadFile = File(...), _: bool = Depends(verify_session)):
     """
     Upload tweets from CSV file.
 
@@ -385,7 +495,7 @@ async def upload_tweets_csv(username: str, file: UploadFile = File(...)):
 
 
 @router.delete("/users/{username}/tweets")
-async def delete_user_tweets(username: str):
+async def delete_user_tweets(username: str, _: bool = Depends(verify_session)):
     """Delete all tweets for a user."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
@@ -406,7 +516,7 @@ async def delete_user_tweets(username: str):
 
 
 @router.delete("/users/{username}")
-async def delete_user(username: str):
+async def delete_user(username: str, _: bool = Depends(verify_session)):
     """Delete a user and all their data."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
@@ -428,7 +538,7 @@ async def delete_user(username: str):
 
 
 @router.get("/stats")
-async def get_admin_stats():
+async def get_admin_stats(_: bool = Depends(verify_session)):
     """Get database statistics."""
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
