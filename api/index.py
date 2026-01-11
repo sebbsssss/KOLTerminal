@@ -181,8 +181,15 @@ async def get_stats():
     return StatsResponse(kols_analyzed=0, total_analyses=0, total_tweets=0, average_score=0)
 
 
+@app.get("/analyze")
+async def analyze_kol_get(username: str, max_tweets: int = 200, force_refresh: bool = False):
+    """Analyze a KOL's credibility (GET method for convenience)."""
+    request = AnalyzeRequest(username=username, max_tweets=max_tweets, force_refresh=force_refresh)
+    return await analyze_kol_post(request)
+
+
 @app.post("/analyze", response_model=AnalysisResponse)
-async def analyze_kol(request: AnalyzeRequest):
+async def analyze_kol_post(request: AnalyzeRequest):
     """Analyze a KOL's credibility."""
     if not engine:
         raise HTTPException(
