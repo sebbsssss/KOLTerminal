@@ -14,8 +14,24 @@ Enhanced with 12 analysis modules:
 """
 
 import asyncio
+import concurrent.futures
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
+
+
+def run_async_safely(coro):
+    """Run an async coroutine safely, handling nested event loops."""
+    try:
+        # Check if we're already in an async context
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop, use asyncio.run()
+        return asyncio.run(coro)
+
+    # We're in an async context - run in a thread pool
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        future = pool.submit(asyncio.run, coro)
+        return future.result()
 
 from .engagement_analyzer import EngagementAnalyzer, EngagementProfile
 from .consistency_tracker import ConsistencyTracker, ConsistencyReport
@@ -262,30 +278,8 @@ class CredibilityEngine:
         )
 
         # Run prediction tracker (async) and temporal analyzer (async)
-        try:
-            prediction_report = asyncio.run(self.prediction_tracker.analyze(tweets))
-        except RuntimeError:
-            # If already in async context, create new loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                prediction_report = loop.run_until_complete(
-                    self.prediction_tracker.analyze(tweets)
-                )
-            finally:
-                loop.close()
-
-        try:
-            temporal_report = asyncio.run(self.temporal_analyzer.analyze(tweets))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                temporal_report = loop.run_until_complete(
-                    self.temporal_analyzer.analyze(tweets)
-                )
-            finally:
-                loop.close()
+        prediction_report = run_async_safely(self.prediction_tracker.analyze(tweets))
+        temporal_report = run_async_safely(self.temporal_analyzer.analyze(tweets))
 
         # Run depth analyzers (sync)
         linguistic_report = self.linguistic_analyzer.analyze(tweets)
