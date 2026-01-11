@@ -281,6 +281,7 @@ async def analyze_kol_post(request: AnalyzeRequest):
             try:
                 kol_id = db.upsert_kol(profile)
                 db.save_tweets(kol_id, tweets)
+                db.save_mentions(kol_id, mentions)  # Cache mentions
                 db.save_analysis(kol_id, result.to_dict(), len(tweets))
             except Exception as e:
                 print(f"Failed to cache: {e}")
