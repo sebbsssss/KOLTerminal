@@ -1,4 +1,8 @@
-from .database import Database
+# Handle imports gracefully for serverless environments
+try:
+    from .database import Database
+except ImportError:
+    Database = None
 
 # Supabase client - optional, requires supabase package
 try:
