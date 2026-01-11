@@ -251,6 +251,9 @@ async def analyze_kol_post(request: AnalyzeRequest):
             max_tweets=min(request.max_tweets, 50)
         )
 
+        # Fetch mentions (what others say about this KOL)
+        mentions = await crawler.search_mentions(username, max_results=20)
+
         tweets_data = [
             {
                 'id': t.id,
@@ -269,7 +272,8 @@ async def analyze_kol_post(request: AnalyzeRequest):
         result = engine.analyze(
             tweets_data,
             profile.follower_count,
-            username
+            username,
+            mentions=mentions  # Pass mentions for reputation analysis
         )
 
         # Try to cache
