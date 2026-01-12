@@ -105,7 +105,7 @@ except Exception as e:
 # Pydantic models
 class AnalyzeRequest(BaseModel):
     username: str = Field(..., description="Twitter username to analyze")
-    max_tweets: int = Field(200, description="Maximum tweets to analyze", ge=10, le=1000)
+    max_tweets: int = Field(1000, description="Maximum tweets to analyze", ge=10, le=2000)
     force_refresh: bool = Field(False, description="Force re-analysis even if cached")
 
 
