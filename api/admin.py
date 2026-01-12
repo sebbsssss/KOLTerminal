@@ -443,9 +443,25 @@ async def upload_tweets_csv(username: str, file: UploadFile = File(...), _: bool
             try:
                 # Map CSV columns to our schema
                 tweet_id = row.get('ID') or row.get('id') or row.get('tweet_id')
+
+                # Try to extract ID from Tweet URL if ID is empty
                 if not tweet_id:
-                    skipped_count += 1
-                    continue
+                    tweet_url = row.get('Tweet URL') or row.get('tweet_url') or ''
+                    # Extract ID from URL like https://x.com/user/status/123456789
+                    if '/status/' in tweet_url:
+                        tweet_id = tweet_url.split('/status/')[-1].split('?')[0].split('/')[0]
+
+                # Generate ID from text hash if still no ID
+                if not tweet_id:
+                    text = row.get('Text') or row.get('text') or ''
+                    created_at = row.get('Created At') or row.get('created_at') or ''
+                    if text:
+                        # Create a unique ID from text + timestamp hash
+                        hash_input = f"{text[:100]}_{created_at}_{username}"
+                        tweet_id = f"gen_{hashlib.md5(hash_input.encode()).hexdigest()[:16]}"
+                    else:
+                        skipped_count += 1
+                        continue
 
                 # Parse timestamp
                 created_at = row.get('Created At') or row.get('created_at') or row.get('timestamp')
