@@ -6,11 +6,12 @@ from pathlib import Path
 
 # Set up paths BEFORE any other imports
 root_dir = Path(__file__).parent.parent.absolute()
+api_dir = Path(__file__).parent.absolute()  # The api/ folder
 kol_analyzer_dir = root_dir / "kol-analyzer"
 src_dir = kol_analyzer_dir / "src"
 
 # Add paths to sys.path
-for path in [str(src_dir), str(kol_analyzer_dir), str(root_dir)]:
+for path in [str(api_dir), str(src_dir), str(kol_analyzer_dir), str(root_dir)]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
