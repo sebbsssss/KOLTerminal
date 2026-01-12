@@ -223,15 +223,9 @@ async def analyze_kol_post(request: AnalyzeRequest):
             detail=f"Analysis engine not available. Import errors: {import_errors}"
         )
 
-    if not TwitterCrawler:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Twitter crawler not available. Import errors: {import_errors}"
-        )
-
     username = request.username.lstrip('@').lower()
 
-    # Check cache first
+    # Check for cached analysis first (unless force_refresh)
     if db and not request.force_refresh:
         try:
             cached = db.get_latest_analysis(username)
@@ -261,7 +255,86 @@ async def analyze_kol_post(request: AnalyzeRequest):
         except Exception as e:
             print(f"Cache lookup failed: {e}")
 
-    # Fetch and analyze
+    # Check if we have cached tweets in Supabase
+    cached_tweets = []
+    kol = None
+    if db:
+        try:
+            kol = db.get_kol(username)
+            if kol:
+                cached_tweets = db.get_tweets(kol["id"], limit=request.max_tweets)
+                print(f"Found {len(cached_tweets)} cached tweets for {username}")
+        except Exception as e:
+            print(f"Failed to get cached tweets: {e}")
+
+    # If we have cached tweets, use them for analysis
+    if cached_tweets and len(cached_tweets) >= 10:
+        tweets_data = [
+            {
+                'id': t.get('tweet_id', t.get('id', '')),
+                'text': t.get('text', ''),
+                'timestamp': t.get('timestamp', ''),
+                'likes': t.get('likes', 0),
+                'retweets': t.get('retweets', 0),
+                'replies': t.get('replies', 0),
+                'has_media': t.get('has_media', False),
+                'has_video': t.get('has_video', False),
+                'is_quote_tweet': t.get('is_quote_tweet', False)
+            }
+            for t in cached_tweets
+        ]
+
+        # Get mentions if available
+        mentions = []
+        try:
+            if db and kol:
+                mentions_result = db.client.table("mentions").select("*").eq("kol_id", kol["id"]).limit(50).execute()
+                mentions = mentions_result.data if mentions_result.data else []
+        except:
+            pass
+
+        result = engine.analyze(
+            tweets_data,
+            kol.get('follower_count', 0) if kol else 0,
+            username,
+            mentions=mentions
+        )
+
+        # Save the new analysis
+        if db and kol:
+            try:
+                db.save_analysis(kol["id"], result.to_dict(), len(tweets_data))
+            except Exception as e:
+                print(f"Failed to save analysis: {e}")
+
+        return AnalysisResponse(
+            username=username,
+            display_name=kol.get('display_name') if kol else None,
+            profile_image_url=kol.get('profile_image_url') if kol else None,
+            follower_count=kol.get('follower_count') if kol else None,
+            overall_score=result.overall_score,
+            grade=result.grade,
+            confidence=result.confidence,
+            assessment=result.assessment,
+            engagement_score=result.engagement_score,
+            consistency_score=result.consistency_score,
+            dissonance_score=result.dissonance_score,
+            baiting_score=result.baiting_score,
+            red_flags=result.red_flags,
+            green_flags=result.green_flags,
+            summary=result.summary,
+            tweets_analyzed=len(tweets_data),
+            analyzed_at=datetime.now().isoformat(),
+            demo_mode=False
+        )
+
+    # No cached tweets - fetch from Twitter API
+    if not TwitterCrawler:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Twitter crawler not available and no cached tweets found. Import errors: {import_errors}"
+        )
+
     rapidapi_key = os.environ.get("RAPIDAPI_KEY", "")
     crawler = TwitterCrawler(rapidapi_key=rapidapi_key)
 
