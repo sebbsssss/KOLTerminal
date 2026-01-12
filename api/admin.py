@@ -602,7 +602,7 @@ async def admin_debug():
         "db_configured": db is not None,
         "db_type": type(db).__name__ if db else None,
         "password_configured": ADMIN_PASSWORD is not None,
-        "active_sessions": len(active_sessions)
+        "jwt_secret_configured": JWT_SECRET is not None
     }
 
 
