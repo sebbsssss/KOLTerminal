@@ -4,12 +4,12 @@ import csv
 import io
 import json
 import hashlib
-import secrets
+import hmac
+import base64
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends, Response, Cookie
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 
@@ -18,9 +18,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # Will be set by main app
 db = None
 ADMIN_PASSWORD = None  # Set from environment variable
-
-# Simple session store (in production, use Redis or database)
-active_sessions = {}
+JWT_SECRET = None  # Will be derived from ADMIN_PASSWORD
 
 
 def set_db(database):
@@ -30,38 +28,79 @@ def set_db(database):
 
 
 def set_admin_password(password: str):
-    """Set the admin password."""
-    global ADMIN_PASSWORD
+    """Set the admin password and derive JWT secret."""
+    global ADMIN_PASSWORD, JWT_SECRET
     ADMIN_PASSWORD = password
+    # Derive a secret for JWT from the password
+    JWT_SECRET = hashlib.sha256(f"jwt_secret_{password}".encode()).hexdigest()
 
 
-def hash_password(password: str) -> str:
-    """Hash a password for comparison."""
-    return hashlib.sha256(password.encode()).hexdigest()
+def create_token(expiry_hours: int = 24) -> str:
+    """Create a simple signed token (stateless)."""
+    if not JWT_SECRET:
+        return "no_auth_required"
+
+    expiry = datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
+    payload = f"{expiry.isoformat()}"
+
+    # Create signature
+    signature = hmac.new(
+        JWT_SECRET.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    # Combine payload and signature
+    token = base64.urlsafe_b64encode(f"{payload}|{signature}".encode()).decode()
+    return token
 
 
-def verify_session(admin_session: Optional[str] = Cookie(None)):
-    """Verify the admin session cookie."""
+def verify_token(token: str) -> bool:
+    """Verify a signed token."""
+    if not JWT_SECRET:
+        return True  # No auth required
+
+    if not token:
+        return False
+
+    try:
+        # Decode token
+        decoded = base64.urlsafe_b64decode(token.encode()).decode()
+        payload, signature = decoded.rsplit("|", 1)
+
+        # Verify signature
+        expected_sig = hmac.new(
+            JWT_SECRET.encode(),
+            payload.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, expected_sig):
+            return False
+
+        # Check expiry
+        expiry = datetime.fromisoformat(payload)
+        if datetime.now(timezone.utc) > expiry:
+            return False
+
+        return True
+    except Exception:
+        return False
+
+
+def verify_session(admin_token: Optional[str] = Cookie(None)):
+    """Verify the admin token cookie."""
     if not ADMIN_PASSWORD:
         # No password set, allow access (for development)
         return True
 
-    if not admin_session:
+    if not admin_token:
         raise HTTPException(
             status_code=401,
             detail="Not authenticated. Please login at /admin-panel"
         )
 
-    if admin_session not in active_sessions:
-        raise HTTPException(
-            status_code=401,
-            detail="Session expired. Please login again."
-        )
-
-    # Check if session is expired (24 hours)
-    session_time = active_sessions[admin_session]
-    if datetime.now(timezone.utc) - session_time > timedelta(hours=24):
-        del active_sessions[admin_session]
+    if not verify_token(admin_token):
         raise HTTPException(
             status_code=401,
             detail="Session expired. Please login again."
@@ -78,12 +117,11 @@ class LoginRequest(BaseModel):
 async def admin_login(request: LoginRequest, response: Response):
     """Login to admin panel."""
     if not ADMIN_PASSWORD:
-        # No password configured, create session anyway
-        session_token = secrets.token_urlsafe(32)
-        active_sessions[session_token] = datetime.now(timezone.utc)
+        # No password configured, create token anyway
+        token = create_token()
         response.set_cookie(
-            key="admin_session",
-            value=session_token,
+            key="admin_token",
+            value=token,
             httponly=True,
             max_age=86400,  # 24 hours
             samesite="lax"
@@ -93,13 +131,12 @@ async def admin_login(request: LoginRequest, response: Response):
     if request.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    # Create session
-    session_token = secrets.token_urlsafe(32)
-    active_sessions[session_token] = datetime.now(timezone.utc)
+    # Create stateless token
+    token = create_token()
 
     response.set_cookie(
-        key="admin_session",
-        value=session_token,
+        key="admin_token",
+        value=token,
         httponly=True,
         max_age=86400,  # 24 hours
         samesite="lax"
@@ -109,25 +146,20 @@ async def admin_login(request: LoginRequest, response: Response):
 
 
 @router.post("/logout")
-async def admin_logout(response: Response, admin_session: Optional[str] = Cookie(None)):
+async def admin_logout(response: Response):
     """Logout from admin panel."""
-    if admin_session and admin_session in active_sessions:
-        del active_sessions[admin_session]
-
-    response.delete_cookie("admin_session")
+    response.delete_cookie("admin_token")
     return {"success": True, "message": "Logged out"}
 
 
 @router.get("/check-auth")
-async def check_auth(admin_session: Optional[str] = Cookie(None)):
+async def check_auth(admin_token: Optional[str] = Cookie(None)):
     """Check if user is authenticated."""
     if not ADMIN_PASSWORD:
         return {"authenticated": True, "password_required": False}
 
-    if admin_session and admin_session in active_sessions:
-        session_time = active_sessions[admin_session]
-        if datetime.now(timezone.utc) - session_time <= timedelta(hours=24):
-            return {"authenticated": True, "password_required": True}
+    if admin_token and verify_token(admin_token):
+        return {"authenticated": True, "password_required": True}
 
     return {"authenticated": False, "password_required": True}
 
