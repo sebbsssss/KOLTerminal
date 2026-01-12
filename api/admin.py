@@ -179,21 +179,31 @@ async def list_users(limit: int = 100, offset: int = 0, _: bool = Depends(verify
             "id, username, display_name, follower_count, tweet_count, latest_score, latest_grade, created_at, updated_at"
         ).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
 
+        if not result.data:
+            return {"users": [], "total": 0, "message": "No users in database. Add users using the form above."}
+
         users = []
         for kol in result.data:
             # Get actual tweet count from tweets table
-            tweet_result = db.client.table("tweets").select(
-                "id", count="exact"
-            ).eq("kol_id", kol["id"]).execute()
+            try:
+                tweet_result = db.client.table("tweets").select(
+                    "id", count="exact"
+                ).eq("kol_id", kol["id"]).execute()
+                stored_tweets = tweet_result.count if tweet_result.count else 0
+            except:
+                stored_tweets = 0
 
             users.append({
                 **kol,
-                "stored_tweets": tweet_result.count if tweet_result.count else 0
+                "stored_tweets": stored_tweets
             })
 
         return {"users": users, "total": len(users)}
 
     except Exception as e:
+        import traceback
+        print(f"Failed to list users: {e}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to list users: {e}")
 
 
@@ -543,25 +553,39 @@ async def get_admin_stats(_: bool = Depends(verify_session)):
     if not db:
         raise HTTPException(status_code=503, detail="Database not configured")
 
+    stats = {
+        "total_kols": 0,
+        "total_tweets": 0,
+        "total_analyses": 0,
+        "total_mentions": 0
+    }
+
     try:
         # Count KOLs
         kols_result = db.client.table("kols").select("id", count="exact").execute()
+        stats["total_kols"] = kols_result.count or 0
+    except Exception as e:
+        print(f"Error counting kols: {e}")
 
+    try:
         # Count tweets
         tweets_result = db.client.table("tweets").select("id", count="exact").execute()
+        stats["total_tweets"] = tweets_result.count or 0
+    except Exception as e:
+        print(f"Error counting tweets: {e}")
 
+    try:
         # Count analyses
         analyses_result = db.client.table("analyses").select("id", count="exact").execute()
-
-        # Count mentions
-        mentions_result = db.client.table("mentions").select("id", count="exact").execute()
-
-        return {
-            "total_kols": kols_result.count or 0,
-            "total_tweets": tweets_result.count or 0,
-            "total_analyses": analyses_result.count or 0,
-            "total_mentions": mentions_result.count or 0
-        }
-
+        stats["total_analyses"] = analyses_result.count or 0
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {e}")
+        print(f"Error counting analyses: {e}")
+
+    try:
+        # Count mentions (may not exist if schema not updated)
+        mentions_result = db.client.table("mentions").select("id", count="exact").execute()
+        stats["total_mentions"] = mentions_result.count or 0
+    except Exception as e:
+        print(f"Error counting mentions (table may not exist): {e}")
+
+    return stats
