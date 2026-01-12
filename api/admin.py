@@ -547,6 +547,17 @@ async def delete_user(username: str, _: bool = Depends(verify_session)):
         raise HTTPException(status_code=500, detail=f"Failed to delete user: {e}")
 
 
+@router.get("/debug")
+async def admin_debug():
+    """Debug endpoint to check admin module status."""
+    return {
+        "db_configured": db is not None,
+        "db_type": type(db).__name__ if db else None,
+        "password_configured": ADMIN_PASSWORD is not None,
+        "active_sessions": len(active_sessions)
+    }
+
+
 @router.get("/stats")
 async def get_admin_stats(_: bool = Depends(verify_session)):
     """Get database statistics."""
