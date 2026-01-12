@@ -87,6 +87,19 @@ try:
 except Exception as e:
     import_errors.append(f"SupabaseDatabase: {e}")
 
+# Import and setup admin router
+try:
+    from admin import router as admin_router, set_db as admin_set_db, set_admin_password
+    app.include_router(admin_router)
+    if db:
+        admin_set_db(db)
+    # Set admin password from environment variable
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if admin_password:
+        set_admin_password(admin_password)
+except Exception as e:
+    import_errors.append(f"AdminRouter: {e}")
+
 
 # Pydantic models
 class AnalyzeRequest(BaseModel):
@@ -141,6 +154,18 @@ async def root():
         </html>
         """,
         status_code=200
+    )
+
+
+@app.get("/admin-panel", response_class=HTMLResponse, include_in_schema=False)
+async def admin_page():
+    """Serve the admin panel UI."""
+    static_file = kol_analyzer_dir / "static" / "admin.html"
+    if static_file.exists():
+        return HTMLResponse(content=static_file.read_text(), status_code=200)
+    return HTMLResponse(
+        content="<html><body><h1>Admin panel not found</h1></body></html>",
+        status_code=404
     )
 
 
