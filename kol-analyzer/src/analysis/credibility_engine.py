@@ -48,6 +48,7 @@ from .linguistic_analyzer import LinguisticAnalyzer, LinguisticReport
 from .accountability_tracker import AccountabilityTracker, AccountabilityReport
 from .network_analyzer import NetworkAnalyzer, NetworkReport
 from .reputation_analyzer import ReputationAnalyzer, ReputationReport
+from .asshole_analyzer import AssholeAnalyzer, AssholeAnalysis
 
 
 @dataclass
@@ -77,6 +78,11 @@ class CredibilityScore:
     network_score: float = 50.0
     reputation_score: float = 50.0  # What others say about the KOL
 
+    # Asshole Meter (personality analysis - separate from credibility)
+    asshole_score: float = 50.0  # 0 = saint, 100 = toxic
+    toxicity_level: str = "mid"  # saint, chill, mid, prickly, toxic
+    toxicity_emoji: str = "😐"
+
     red_flags: List[str] = field(default_factory=list)
     green_flags: List[str] = field(default_factory=list)
     summary: str = ""
@@ -95,6 +101,7 @@ class CredibilityScore:
     accountability_report: Optional[Dict] = None
     network_report: Optional[Dict] = None
     reputation_report: Optional[Dict] = None
+    asshole_report: Optional[Dict] = None
 
     # Archetype classification
     archetype: Optional[str] = None
@@ -122,6 +129,9 @@ class CredibilityScore:
             'accountability_score': round(self.accountability_score, 1),
             'network_score': round(self.network_score, 1),
             'reputation_score': round(self.reputation_score, 1),
+            'asshole_score': round(self.asshole_score, 1),
+            'toxicity_level': self.toxicity_level,
+            'toxicity_emoji': self.toxicity_emoji,
             'red_flags': self.red_flags,
             'green_flags': self.green_flags,
             'summary': self.summary,
@@ -234,6 +244,9 @@ class CredibilityEngine:
         # Initialize reputation analyzer (what others say)
         self.reputation_analyzer = ReputationAnalyzer()
 
+        # Initialize asshole analyzer (personality/toxicity)
+        self.asshole_analyzer = AssholeAnalyzer()
+
         # Archetype classifier
         self.archetype_classifier = ArchetypeClassifier()
 
@@ -305,6 +318,9 @@ class CredibilityEngine:
         else:
             # Use demo mode if no mentions provided
             reputation_report = self.reputation_analyzer.analyze_demo(username)
+
+        # Run asshole analyzer (personality/toxicity meter)
+        asshole_report = self.asshole_analyzer.analyze(tweets, username)
 
         # Extract scores from original analyzers
         engagement_score = engagement_profile.authenticity_score
@@ -440,6 +456,9 @@ class CredibilityEngine:
             accountability_score=accountability_score,
             network_score=network_score,
             reputation_score=reputation_score,
+            asshole_score=asshole_report.asshole_score,
+            toxicity_level=asshole_report.toxicity_level,
+            toxicity_emoji=asshole_report.toxicity_emoji,
             red_flags=red_flags,
             green_flags=green_flags,
             summary=summary,
@@ -460,6 +479,7 @@ class CredibilityEngine:
             accountability_report=accountability_report.to_dict(),
             network_report=network_report.to_dict(),
             reputation_report=reputation_report.to_dict(),
+            asshole_report=asshole_report.to_dict(),
             archetype_report=archetype_profile.to_dict()
         )
 

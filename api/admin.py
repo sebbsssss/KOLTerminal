@@ -539,8 +539,15 @@ async def upload_tweets_csv(username: str, file: UploadFile = File(...), _: bool
         except:
             pass
 
+        # Delete old cached analyses so next query triggers fresh analysis with new tweets
+        if saved_count > 0:
+            try:
+                db.client.table("analyses").delete().eq("kol_id", kol_id).execute()
+            except:
+                pass
+
         return {
-            "message": f"Uploaded {saved_count} tweets for @{username}",
+            "message": f"Uploaded {saved_count} tweets for @{username}. Old analysis cleared - next query will use all {count_result.count if count_result else saved_count} tweets.",
             "saved": saved_count,
             "skipped": skipped_count,
             "errors": errors[:10] if errors else None
