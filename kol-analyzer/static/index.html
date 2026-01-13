@@ -1401,6 +1401,7 @@
                 showToast(rand(successMsgs), 'success');
 
             } catch (e) {
+                console.error('Search error:', e);
                 document.getElementById('results-container').innerHTML = `
                     <div class="loading-card">
                         <div style="font-size: 32px; margin-bottom: 16px; opacity: 0.3; font-family: 'EB Garamond', serif; font-style: italic">:/</div>
@@ -1472,6 +1473,7 @@
             const redFlags = analysis.red_flags || [];
             const greenFlags = analysis.green_flags || [];
             const grade = analysis.grade || '?';
+            const tweetsAnalyzed = analysis.tweets_analyzed || 0;
 
             return `
                 <div class="stats-row">
