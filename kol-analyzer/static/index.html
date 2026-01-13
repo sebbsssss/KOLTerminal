@@ -593,76 +593,127 @@
             border-bottom: 1px solid var(--border);
         }
 
-        .metrics-grid {
+        .vibes-container {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
         }
 
-        .metric-card {
-            background: var(--bg-cream);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 16px;
-        }
-
-        .metric-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .metric-name {
-            font-size: 13px;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        .metric-value {
-            font-size: 20px;
-            font-weight: 500;
-            font-family: 'EB Garamond', serif;
-        }
-
-        .metric-card.engagement .metric-value { color: var(--accent); }
-        .metric-card.consistency .metric-value { color: var(--success); }
-        .metric-card.dissonance .metric-value { color: var(--danger); }
-        .metric-card.baiting .metric-value { color: var(--warning); }
-        .metric-card.privilege .metric-value { color: #9333ea; }
-        .metric-card.prediction .metric-value { color: #0891b2; }
-        .metric-card.transparency .metric-value { color: #16a34a; }
-        .metric-card.follower_quality .metric-value { color: #dc2626; }
-        .metric-card.temporal .metric-value { color: #0d9488; }
-        .metric-card.linguistic .metric-value { color: #7c3aed; }
-        .metric-card.accountability .metric-value { color: #ea580c; }
-        .metric-card.network .metric-value { color: #4f46e5; }
-
-        .metric-bar {
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
+        .vibes-column {
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
             overflow: hidden;
         }
 
-        .metric-bar-fill {
-            height: 100%;
-            border-radius: 2px;
-            transition: width 0.8s ease;
+        .vibes-column::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
         }
 
-        .metric-card.engagement .metric-bar-fill { background: var(--accent); }
-        .metric-card.consistency .metric-bar-fill { background: var(--success); }
-        .metric-card.dissonance .metric-bar-fill { background: var(--danger); }
-        .metric-card.baiting .metric-bar-fill { background: var(--warning); }
-        .metric-card.privilege .metric-bar-fill { background: #9333ea; }
-        .metric-card.prediction .metric-bar-fill { background: #0891b2; }
-        .metric-card.transparency .metric-bar-fill { background: #16a34a; }
-        .metric-card.follower_quality .metric-bar-fill { background: #dc2626; }
-        .metric-card.temporal .metric-bar-fill { background: #0d9488; }
-        .metric-card.linguistic .metric-bar-fill { background: #7c3aed; }
-        .metric-card.accountability .metric-bar-fill { background: #ea580c; }
-        .metric-card.network .metric-bar-fill { background: #4f46e5; }
+        .vibes-column.good {
+            background: linear-gradient(to bottom, rgba(16, 185, 129, 0.08), transparent);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .vibes-column.good::before {
+            background: linear-gradient(90deg, #10b981, #34d399);
+        }
+
+        .vibes-column.sus {
+            background: linear-gradient(to bottom, rgba(239, 68, 68, 0.08), transparent);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .vibes-column.sus::before {
+            background: linear-gradient(90deg, #ef4444, #f87171);
+        }
+
+        .vibes-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .vibes-emoji {
+            font-size: 20px;
+        }
+
+        .vibes-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: lowercase;
+            letter-spacing: 0.5px;
+        }
+
+        .vibes-column.good .vibes-title { color: #10b981; }
+        .vibes-column.sus .vibes-title { color: #ef4444; }
+
+        .vibes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .vibe-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .vibe-name {
+            font-size: 12px;
+            color: var(--text-secondary);
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .vibe-bar-container {
+            flex: 1;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .vibe-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .vibe-bar.good { background: linear-gradient(90deg, #10b981, #34d399); }
+        .vibe-bar.sus { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        .vibe-value {
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'EB Garamond', serif;
+            width: 32px;
+            text-align: right;
+        }
+
+        .vibes-column.good .vibe-value { color: #10b981; }
+        .vibes-column.sus .vibe-value { color: #ef4444; }
+
+        @media (max-width: 640px) {
+            .vibes-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Legacy metric styles for radar chart compatibility */
+        .metrics-grid { display: none; }
+        .metric-card { display: none; }
 
         .charts-row {
             display: grid;
@@ -1147,113 +1198,105 @@
 
                 <div class="metrics-section">
                     <div class="section-title">the numbers or whatever</div>
-                    <div class="metrics-grid">
-                        <div class="metric-card engagement">
-                            <div class="metric-header">
-                                <span class="metric-name">engagement</span>
-                                <span class="metric-value">${engagement.toFixed(0)}</span>
+                    <div class="vibes-container">
+                        <div class="vibes-column good">
+                            <div class="vibes-header">
+                                <span class="vibes-emoji">&#x2728;</span>
+                                <span class="vibes-title">good vibes</span>
                             </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-engagement" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card consistency">
-                            <div class="metric-header">
-                                <span class="metric-name">consistency</span>
-                                <span class="metric-value">${consistency.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-consistency" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card dissonance">
-                            <div class="metric-header">
-                                <span class="metric-name">sus level</span>
-                                <span class="metric-value">${dissonance.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-dissonance" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card baiting">
-                            <div class="metric-header">
-                                <span class="metric-name">bait energy</span>
-                                <span class="metric-value">${baiting.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-baiting" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card privilege">
-                            <div class="metric-header">
-                                <span class="metric-name">high horse</span>
-                                <span class="metric-value">${privilege.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-privilege" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card prediction">
-                            <div class="metric-header">
-                                <span class="metric-name">track record</span>
-                                <span class="metric-value">${prediction.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-prediction" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card transparency">
-                            <div class="metric-header">
-                                <span class="metric-name">shill honesty</span>
-                                <span class="metric-value">${transparency.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-transparency" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card follower_quality">
-                            <div class="metric-header">
-                                <span class="metric-name">real simps</span>
-                                <span class="metric-value">${followerQuality.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-follower_quality" style="width: 0%"></div>
+                            <div class="vibes-list">
+                                <div class="vibe-item">
+                                    <span class="vibe-name">engagement</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-engagement" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${engagement.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">consistency</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-consistency" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${consistency.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">track record</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-prediction" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${prediction.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">shill honesty</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-transparency" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${transparency.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">timing</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-temporal" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${temporal.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">language</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-linguistic" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${linguistic.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">owns Ls</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-accountability" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${accountability.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">network</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar good" id="vibe-${username}-network" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${network.toFixed(0)}</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="metric-card temporal">
-                            <div class="metric-header">
-                                <span class="metric-name">timing</span>
-                                <span class="metric-value">${temporal.toFixed(0)}</span>
+                        <div class="vibes-column sus">
+                            <div class="vibes-header">
+                                <span class="vibes-emoji">&#x1F6A9;</span>
+                                <span class="vibes-title">red flags</span>
                             </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-temporal" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card linguistic">
-                            <div class="metric-header">
-                                <span class="metric-name">language</span>
-                                <span class="metric-value">${linguistic.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-linguistic" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card accountability">
-                            <div class="metric-header">
-                                <span class="metric-name">owns Ls</span>
-                                <span class="metric-value">${accountability.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-accountability" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-card network">
-                            <div class="metric-header">
-                                <span class="metric-name">network</span>
-                                <span class="metric-value">${network.toFixed(0)}</span>
-                            </div>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" id="bar-${username}-network" style="width: 0%"></div>
+                            <div class="vibes-list">
+                                <div class="vibe-item">
+                                    <span class="vibe-name">sus level</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar sus" id="vibe-${username}-dissonance" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${dissonance.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">bait energy</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar sus" id="vibe-${username}-baiting" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${baiting.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">high horse</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar sus" id="vibe-${username}-privilege" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${privilege.toFixed(0)}</span>
+                                </div>
+                                <div class="vibe-item">
+                                    <span class="vibe-name">fake simps</span>
+                                    <div class="vibe-bar-container">
+                                        <div class="vibe-bar sus" id="vibe-${username}-follower_quality" style="width: 0%"></div>
+                                    </div>
+                                    <span class="vibe-value">${(100 - followerQuality).toFixed(0)}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1311,10 +1354,23 @@
         }
 
         function animateMetricBars(username, analysis) {
-            ['engagement', 'consistency', 'dissonance', 'baiting', 'privilege', 'prediction', 'transparency', 'follower_quality', 'temporal', 'linguistic', 'accountability', 'network'].forEach(m => {
-                const bar = document.getElementById(`bar-${username}-${m}`);
+            // Animate new vibe bars
+            const goodVibes = ['engagement', 'consistency', 'prediction', 'transparency', 'temporal', 'linguistic', 'accountability', 'network'];
+            const susVibes = ['dissonance', 'baiting', 'privilege'];
+
+            goodVibes.forEach(m => {
+                const bar = document.getElementById(`vibe-${username}-${m}`);
                 if (bar) bar.style.width = `${analysis[`${m}_score`] || 50}%`;
             });
+
+            susVibes.forEach(m => {
+                const bar = document.getElementById(`vibe-${username}-${m}`);
+                if (bar) bar.style.width = `${analysis[`${m}_score`] || 50}%`;
+            });
+
+            // Fake simps is inverted (100 - follower_quality)
+            const fakeSimpsBar = document.getElementById(`vibe-${username}-follower_quality`);
+            if (fakeSimpsBar) fakeSimpsBar.style.width = `${100 - (analysis.follower_quality_score || 50)}%`;
         }
 
         function drawCharts(username, analysis) {
