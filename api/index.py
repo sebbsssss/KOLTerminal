@@ -234,31 +234,45 @@ async def analyze_kol_post(request: AnalyzeRequest):
         try:
             cached = db.get_latest_analysis(username)
             if cached:
-                # Get KOL profile for display info
+                # Check if we have more cached tweets than were analyzed
                 kol = db.get_kol(username)
-                return AnalysisResponse(
-                    username=username,
-                    display_name=kol.get('display_name') if kol else None,
-                    profile_image_url=kol.get('profile_image_url') if kol else None,
-                    follower_count=kol.get('follower_count') if kol else None,
-                    overall_score=cached['overall_score'],
-                    grade=cached['grade'],
-                    confidence=cached['confidence'],
-                    assessment=cached['assessment'],
-                    engagement_score=cached['engagement_score'],
-                    consistency_score=cached['consistency_score'],
-                    dissonance_score=cached['dissonance_score'],
-                    baiting_score=cached['baiting_score'],
-                    red_flags=cached['red_flags'],
-                    green_flags=cached['green_flags'],
-                    summary=cached['summary'],
-                    tweets_analyzed=cached['tweets_analyzed'],
-                    analyzed_at=cached['created_at'],
-                    demo_mode=False,
-                    asshole_score=cached.get('asshole_score', 50.0),
-                    toxicity_level=cached.get('toxicity_level', 'mid'),
-                    toxicity_emoji=cached.get('toxicity_emoji', '😐')
-                )
+                if kol:
+                    cached_tweet_count = 0
+                    try:
+                        count_result = db.client.table("tweets").select("id", count="exact").eq("kol_id", kol["id"]).execute()
+                        cached_tweet_count = count_result.count or 0
+                    except:
+                        pass
+
+                    # If we have significantly more tweets (>20% more), skip cached analysis
+                    analyzed_count = cached.get('tweets_analyzed', 0)
+                    if cached_tweet_count > analyzed_count * 1.2 and cached_tweet_count >= 20:
+                        print(f"Skipping cached analysis: have {cached_tweet_count} tweets but only analyzed {analyzed_count}")
+                    else:
+                        # Return cached analysis
+                        return AnalysisResponse(
+                            username=username,
+                            display_name=kol.get('display_name') if kol else None,
+                            profile_image_url=kol.get('profile_image_url') if kol else None,
+                            follower_count=kol.get('follower_count') if kol else None,
+                            overall_score=cached['overall_score'],
+                            grade=cached['grade'],
+                            confidence=cached['confidence'],
+                            assessment=cached['assessment'],
+                            engagement_score=cached['engagement_score'],
+                            consistency_score=cached['consistency_score'],
+                            dissonance_score=cached['dissonance_score'],
+                            baiting_score=cached['baiting_score'],
+                            red_flags=cached['red_flags'],
+                            green_flags=cached['green_flags'],
+                            summary=cached['summary'],
+                            tweets_analyzed=cached['tweets_analyzed'],
+                            analyzed_at=cached['created_at'],
+                            demo_mode=False,
+                            asshole_score=cached.get('asshole_score', 50.0),
+                            toxicity_level=cached.get('toxicity_level', 'mid'),
+                            toxicity_emoji=cached.get('toxicity_emoji', '😐')
+                        )
         except Exception as e:
             print(f"Cache lookup failed: {e}")
 
