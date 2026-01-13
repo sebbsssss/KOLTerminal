@@ -49,6 +49,7 @@ from .accountability_tracker import AccountabilityTracker, AccountabilityReport
 from .network_analyzer import NetworkAnalyzer, NetworkReport
 from .reputation_analyzer import ReputationAnalyzer, ReputationReport
 from .asshole_analyzer import AssholeAnalyzer, AssholeAnalysis
+from .contradiction_analyzer import ContradictionAnalyzer, ContradictionAnalysis
 
 
 @dataclass
@@ -82,6 +83,12 @@ class CredibilityScore:
     asshole_score: float = 50.0  # 0 = saint, 100 = toxic
     toxicity_level: str = "mid"  # saint, chill, mid, prickly, toxic
     toxicity_emoji: str = "😐"
+
+    # Contradiction Analysis (BS detection)
+    bs_score: float = 0.0  # 0 = trustworthy, 100 = full of BS
+    contradiction_count: int = 0
+    contradictions: List[Dict] = field(default_factory=list)  # Top contradictions found
+    contradiction_report: Optional[Dict] = None
 
     red_flags: List[str] = field(default_factory=list)
     green_flags: List[str] = field(default_factory=list)
@@ -132,6 +139,9 @@ class CredibilityScore:
             'asshole_score': round(self.asshole_score, 1),
             'toxicity_level': self.toxicity_level,
             'toxicity_emoji': self.toxicity_emoji,
+            'bs_score': round(self.bs_score, 1),
+            'contradiction_count': self.contradiction_count,
+            'contradictions': self.contradictions,
             'red_flags': self.red_flags,
             'green_flags': self.green_flags,
             'summary': self.summary,
@@ -247,6 +257,9 @@ class CredibilityEngine:
         # Initialize asshole analyzer (personality/toxicity)
         self.asshole_analyzer = AssholeAnalyzer()
 
+        # Initialize contradiction analyzer (BS detection)
+        self.contradiction_analyzer = ContradictionAnalyzer()
+
         # Archetype classifier
         self.archetype_classifier = ArchetypeClassifier()
 
@@ -321,6 +334,9 @@ class CredibilityEngine:
 
         # Run asshole analyzer (personality/toxicity meter)
         asshole_report = self.asshole_analyzer.analyze(tweets, username)
+
+        # Run contradiction analyzer (BS detection)
+        contradiction_report = self.contradiction_analyzer.analyze(tweets, username)
 
         # Extract scores from original analyzers
         engagement_score = engagement_profile.authenticity_score
@@ -459,6 +475,10 @@ class CredibilityEngine:
             asshole_score=asshole_report.asshole_score,
             toxicity_level=asshole_report.toxicity_level,
             toxicity_emoji=asshole_report.toxicity_emoji,
+            bs_score=contradiction_report.bs_score,
+            contradiction_count=contradiction_report.contradiction_count,
+            contradictions=[c.to_dict() for c in contradiction_report.contradictions[:5]],
+            contradiction_report=contradiction_report.to_dict(),
             red_flags=red_flags,
             green_flags=green_flags,
             summary=summary,

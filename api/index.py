@@ -132,6 +132,10 @@ class AnalysisResponse(BaseModel):
     asshole_score: float = 50.0
     toxicity_level: str = "mid"
     toxicity_emoji: str = "😐"
+    # Contradiction/BS Detection
+    bs_score: float = 0.0
+    contradiction_count: int = 0
+    contradictions: List[dict] = []
 
 
 class StatsResponse(BaseModel):
@@ -271,7 +275,10 @@ async def analyze_kol_post(request: AnalyzeRequest):
                             demo_mode=False,
                             asshole_score=cached.get('asshole_score', 50.0),
                             toxicity_level=cached.get('toxicity_level', 'mid'),
-                            toxicity_emoji=cached.get('toxicity_emoji', '😐')
+                            toxicity_emoji=cached.get('toxicity_emoji', '😐'),
+                            bs_score=cached.get('bs_score', 0.0),
+                            contradiction_count=cached.get('contradiction_count', 0),
+                            contradictions=cached.get('contradictions', [])
                         )
         except Exception as e:
             print(f"Cache lookup failed: {e}")
@@ -349,7 +356,10 @@ async def analyze_kol_post(request: AnalyzeRequest):
             demo_mode=False,
             asshole_score=result.asshole_score,
             toxicity_level=result.toxicity_level,
-            toxicity_emoji=result.toxicity_emoji
+            toxicity_emoji=result.toxicity_emoji,
+            bs_score=result.bs_score,
+            contradiction_count=result.contradiction_count,
+            contradictions=result.contradictions
         )
 
     # No cached tweets - fetch from Twitter API
@@ -430,7 +440,10 @@ async def analyze_kol_post(request: AnalyzeRequest):
             demo_mode=crawler.demo_mode,
             asshole_score=result.asshole_score,
             toxicity_level=result.toxicity_level,
-            toxicity_emoji=result.toxicity_emoji
+            toxicity_emoji=result.toxicity_emoji,
+            bs_score=result.bs_score,
+            contradiction_count=result.contradiction_count,
+            contradictions=result.contradictions
         )
 
     except HTTPException:
