@@ -28,14 +28,14 @@ class Contradiction:
             "description": self.description,
             "time_between_days": self.time_between_days,
             "original": {
-                "text": self.original_tweet.get("text", "")[:280],
-                "date": self.original_tweet.get("timestamp", ""),
-                "id": self.original_tweet.get("id", "")
+                "text": (self.original_tweet.get("text") or "")[:280],
+                "date": self.original_tweet.get("timestamp") or "",
+                "id": str(self.original_tweet.get("id") or "")
             },
             "contradicting": {
-                "text": self.contradicting_tweet.get("text", "")[:280],
-                "date": self.contradicting_tweet.get("timestamp", ""),
-                "id": self.contradicting_tweet.get("id", "")
+                "text": (self.contradicting_tweet.get("text") or "")[:280],
+                "date": self.contradicting_tweet.get("timestamp") or "",
+                "id": str(self.contradicting_tweet.get("id") or "")
             }
         }
 
@@ -127,7 +127,7 @@ class ContradictionAnalyzer:
 
         # Extract all statements
         for tweet in sorted_tweets:
-            text = tweet.get('text', '')
+            text = tweet.get('text') or ''
             if not text:
                 continue
 

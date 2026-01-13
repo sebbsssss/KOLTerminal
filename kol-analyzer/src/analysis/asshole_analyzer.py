@@ -152,7 +152,7 @@ class AssholeAnalyzer:
         helpful_examples = []
 
         for tweet in tweets:
-            text = tweet.get('text', '')
+            text = tweet.get('text') or ''
             if not text:
                 continue
 
