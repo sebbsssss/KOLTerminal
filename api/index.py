@@ -128,6 +128,10 @@ class AnalysisResponse(BaseModel):
     tweets_analyzed: int
     analyzed_at: str
     demo_mode: bool = False
+    # Asshole Meter
+    asshole_score: float = 50.0
+    toxicity_level: str = "mid"
+    toxicity_emoji: str = "😐"
 
 
 class StatsResponse(BaseModel):
@@ -250,7 +254,10 @@ async def analyze_kol_post(request: AnalyzeRequest):
                     summary=cached['summary'],
                     tweets_analyzed=cached['tweets_analyzed'],
                     analyzed_at=cached['created_at'],
-                    demo_mode=False
+                    demo_mode=False,
+                    asshole_score=cached.get('asshole_score', 50.0),
+                    toxicity_level=cached.get('toxicity_level', 'mid'),
+                    toxicity_emoji=cached.get('toxicity_emoji', '😐')
                 )
         except Exception as e:
             print(f"Cache lookup failed: {e}")
@@ -325,7 +332,10 @@ async def analyze_kol_post(request: AnalyzeRequest):
             summary=result.summary,
             tweets_analyzed=len(tweets_data),
             analyzed_at=datetime.now().isoformat(),
-            demo_mode=False
+            demo_mode=False,
+            asshole_score=result.asshole_score,
+            toxicity_level=result.toxicity_level,
+            toxicity_emoji=result.toxicity_emoji
         )
 
     # No cached tweets - fetch from Twitter API
@@ -403,7 +413,10 @@ async def analyze_kol_post(request: AnalyzeRequest):
             summary=result.summary,
             tweets_analyzed=len(tweets),
             analyzed_at=datetime.now().isoformat(),
-            demo_mode=crawler.demo_mode
+            demo_mode=crawler.demo_mode,
+            asshole_score=result.asshole_score,
+            toxicity_level=result.toxicity_level,
+            toxicity_emoji=result.toxicity_emoji
         )
 
     except HTTPException:
