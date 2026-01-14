@@ -471,6 +471,24 @@ async def get_kol(username: str):
         raise HTTPException(status_code=404, detail=f"No analysis found for @{username}")
 
     analysis = db.get_latest_analysis(username)
+
+    # Check if we have significantly more tweets than were analyzed
+    # If so, return 404 to trigger re-analysis via /analyze endpoint
+    if analysis:
+        try:
+            count_result = db.client.table("tweets").select("id", count="exact").eq("kol_id", kol["id"]).execute()
+            cached_tweet_count = count_result.count or 0
+            analyzed_count = analysis.get('tweets_analyzed', 0)
+
+            # If we have 20% more tweets (and at least 20 total), skip cached and trigger re-analysis
+            if cached_tweet_count > analyzed_count * 1.2 and cached_tweet_count >= 20:
+                print(f"[/kol] Skipping cache for {username}: have {cached_tweet_count} tweets but only analyzed {analyzed_count}")
+                raise HTTPException(status_code=404, detail=f"Re-analysis needed for @{username}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[/kol] Error checking tweet count: {e}")
+
     return {"kol": kol, "analysis": analysis}
 
 
