@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>how it works | kol terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-paper: #f5f1eb;
+            --bg-cream: #faf8f5;
+            --bg-card: #fffef9;
+            --bg-white: #ffffff;
+
+            --text-primary: #37352f;
+            --text-secondary: #6b6b6b;
+            --text-muted: #9b9a97;
+            --text-light: #b8b8b5;
+
+            --accent: #2383e2;
+            --accent-soft: rgba(35, 131, 226, 0.1);
+            --success: #0f7b6c;
+            --success-soft: rgba(15, 123, 108, 0.1);
+            --warning: #d9730d;
+            --warning-soft: rgba(217, 115, 13, 0.1);
+            --danger: #e03e3e;
+            --danger-soft: rgba(224, 62, 62, 0.1);
+
+            --border: rgba(55, 53, 47, 0.09);
+            --border-dark: rgba(55, 53, 47, 0.16);
+
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.05);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+            --shadow-paper: 0 1px 3px rgba(0,0,0,0.06), 0 4px 8px rgba(0,0,0,0.04);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-paper);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .paper-bg {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"),
+                linear-gradient(135deg, #f5f1eb 0%, #ebe7e0 50%, #f0ece5 100%);
+            background-blend-mode: soft-light;
+            opacity: 0.5;
+        }
+
+        .paper-texture {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.4) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(0,0,0,0.02) 0%, transparent 40%),
+                radial-gradient(ellipse at 50% 50%, rgba(200,195,185,0.1) 0%, transparent 60%);
+        }
+
+        .fold-lines {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                linear-gradient(90deg, transparent 49.8%, rgba(0,0,0,0.015) 50%, transparent 50.2%),
+                linear-gradient(0deg, transparent 49.8%, rgba(0,0,0,0.015) 50%, transparent 50.2%);
+            background-size: 100% 100%;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background: rgba(250, 248, 245, 0.8);
+            backdrop-filter: blur(8px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            text-decoration: none;
+        }
+
+        .logo:hover {
+            opacity: 0.7;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--text-primary);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--bg-white);
+            font-family: 'EB Garamond', serif;
+        }
+
+        .logo-text {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 4px;
+        }
+
+        .header-link {
+            padding: 6px 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+
+        .header-link:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .header-link.active {
+            background: var(--text-primary);
+            color: var(--bg-white);
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .docs-container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 60px 24px 80px;
+            width: 100%;
+        }
+
+        .docs-header {
+            margin-bottom: 48px;
+            text-align: center;
+        }
+
+        .docs-title {
+            font-family: 'EB Garamond', serif;
+            font-size: 48px;
+            font-weight: 400;
+            font-style: italic;
+            letter-spacing: -1px;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .docs-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .paper-card {
+            background: var(--bg-white);
+            border-radius: 3px;
+            box-shadow: var(--shadow-paper);
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .paper-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(0,0,0,0.02) 10%,
+                transparent 20%,
+                rgba(0,0,0,0.015) 35%,
+                transparent 50%,
+                rgba(0,0,0,0.02) 65%,
+                transparent 80%,
+                rgba(0,0,0,0.015) 90%,
+                transparent 100%
+            );
+        }
+
+        .paper-card::after {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 0;
+            bottom: 8px;
+            width: 4px;
+            background: linear-gradient(180deg,
+                transparent,
+                rgba(0,0,0,0.02) 20%,
+                rgba(0,0,0,0.03) 50%,
+                rgba(0,0,0,0.02) 80%,
+                transparent
+            );
+        }
+
+        .card-content {
+            padding: 32px;
+        }
+
+        .section-number {
+            font-family: 'EB Garamond', serif;
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            font-family: 'EB Garamond', serif;
+            font-size: 24px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .section-text {
+            font-size: 15px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            margin-bottom: 16px;
+        }
+
+        .section-text:last-child {
+            margin-bottom: 0;
+        }
+
+        .highlight-box {
+            background: var(--bg-cream);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 4px 4px 0;
+            padding: 16px 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box.warning {
+            border-left-color: var(--warning);
+        }
+
+        .highlight-box.success {
+            border-left-color: var(--success);
+        }
+
+        .highlight-box.danger {
+            border-left-color: var(--danger);
+        }
+
+        .highlight-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .module-item {
+            background: var(--bg-cream);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 14px 16px;
+        }
+
+        .module-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .module-weight {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+
+        .module-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .formula-box {
+            background: var(--text-primary);
+            border-radius: 4px;
+            padding: 16px 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .formula-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--bg-cream);
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .grade-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .grade-table th,
+        .grade-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .grade-table th {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: lowercase;
+            letter-spacing: 0.5px;
+        }
+
+        .grade-table td {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .grade-badge {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 28px;
+            font-weight: 600;
+            font-family: 'EB Garamond', serif;
+        }
+
+        .grade-a { background: var(--success-soft); color: var(--success); }
+        .grade-b { background: var(--accent-soft); color: var(--accent); }
+        .grade-c { background: var(--warning-soft); color: var(--warning); }
+        .grade-d { background: var(--danger-soft); color: var(--danger); }
+        .grade-f { background: var(--danger-soft); color: var(--danger); }
+
+        .detection-list {
+            margin: 16px 0;
+        }
+
+        .detection-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .detection-item:last-child {
+            border-bottom: none;
+        }
+
+        .detection-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+            background: var(--danger-soft);
+            color: var(--danger);
+        }
+
+        .detection-content {
+            flex: 1;
+        }
+
+        .detection-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .detection-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: lowercase;
+            margin-left: 8px;
+        }
+
+        .severity-high { background: var(--danger-soft); color: var(--danger); }
+        .severity-medium { background: var(--warning-soft); color: var(--warning); }
+        .severity-low { background: var(--border); color: var(--text-muted); }
+
+        .toc {
+            background: var(--bg-cream);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 20px 24px;
+            margin-bottom: 32px;
+        }
+
+        .toc-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: lowercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .toc-list {
+            list-style: none;
+        }
+
+        .toc-item {
+            padding: 6px 0;
+        }
+
+        .toc-link {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.15s;
+        }
+
+        .toc-link:hover {
+            color: var(--accent);
+        }
+
+        .toc-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: 8px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 24px;
+            margin-top: auto;
+        }
+
+        @media (max-width: 640px) {
+            .docs-title {
+                font-size: 36px;
+            }
+
+            .module-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card-content {
+                padding: 24px;
+            }
+
+            .header {
+                padding: 12px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="paper-bg"></div>
+    <div class="paper-texture"></div>
+    <div class="fold-lines"></div>
+
+    <div class="app">
+        <header class="header">
+            <a href="/" class="logo">
+                <div class="logo-icon">k</div>
+                <div class="logo-text">kol terminal</div>
+            </a>
+            <nav class="header-nav">
+                <a href="/" class="header-link">home</a>
+                <a href="/docs.html" class="header-link active">how it works</a>
+            </nav>
+        </header>
+
+        <main class="main">
+            <div class="docs-container">
+                <div class="docs-header">
+                    <h1 class="docs-title">how this thing works</h1>
+                    <p class="docs-subtitle">the algorithm behind judging your favorite crypto influencer</p>
+                </div>
+
+                <div class="toc">
+                    <div class="toc-title">table of contents</div>
+                    <ul class="toc-list">
+                        <li class="toc-item"><a href="#overview" class="toc-link"><span class="toc-number">01</span>overview</a></li>
+                        <li class="toc-item"><a href="#modules" class="toc-link"><span class="toc-number">02</span>the 13 analysis modules</a></li>
+                        <li class="toc-item"><a href="#bs-meter" class="toc-link"><span class="toc-number">03</span>contradiction detection (bs meter)</a></li>
+                        <li class="toc-item"><a href="#scoring" class="toc-link"><span class="toc-number">04</span>scoring and grades</a></li>
+                        <li class="toc-item"><a href="#archetypes" class="toc-link"><span class="toc-number">05</span>archetypes and trust levels</a></li>
+                        <li class="toc-item"><a href="#limitations" class="toc-link"><span class="toc-number">06</span>limitations</a></li>
+                    </ul>
+                </div>
+
+                <div class="paper-card" id="overview">
+                    <div class="card-content">
+                        <div class="section-number">01</div>
+                        <h2 class="section-title">Overview</h2>
+                        <p class="section-text">
+                            KOL Terminal analyzes crypto Twitter accounts to help you figure out who's actually worth listening to and who's full of it. We crawl tweets, run them through multiple analysis modules, and spit out a credibility score.
+                        </p>
+                        <p class="section-text">
+                            The system uses a multi-layered approach: 13 different analyzers examine different aspects of an account's behavior, from engagement patterns to consistency to linguistic manipulation tactics. Each module produces a score from 0-100, which are then weighted and combined into an overall credibility score.
+                        </p>
+                        <div class="highlight-box">
+                            <p class="highlight-text">
+                                <strong>How it works:</strong> We fetch recent tweets (up to 1000), run them through our analysis pipeline, and aggregate the results. The more tweets we can analyze, the higher our confidence in the results.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="paper-card" id="modules">
+                    <div class="card-content">
+                        <div class="section-number">02</div>
+                        <h2 class="section-title">The 13 Analysis Modules</h2>
+                        <p class="section-text">
+                            Each module examines a specific aspect of the account's behavior. They run in parallel and contribute to the final score based on their assigned weights.
+                        </p>
+
+                        <div class="module-grid">
+                            <div class="module-item">
+                                <div class="module-name">Reputation</div>
+                                <div class="module-weight">weight: 11%</div>
+                                <div class="module-desc">What others say about this person. Highest weighted because community consensus matters.</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Consistency</div>
+                                <div class="module-weight">weight: 9%</div>
+                                <div class="module-desc">Do they flip positions on tokens? Tracks sentiment history per ticker and detects reversals.</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Baiting</div>
+                                <div class="module-weight">weight: 9%</div>
+                                <div class="module-desc">FOMO tactics, engagement farming, reward gaming, and manipulation patterns.</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Prediction</div>
+                                <div class="module-weight">weight: 9%</div>
+                                <div class="module-desc">Track record on past calls. Did their predictions actually pan out?</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Privilege</div>
+                                <div class="module-weight">weight: 8%</div>
+                                <div class="module-desc">"High horse" moralism and empathy levels. Are they punching down on others?</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Engagement</div>
+                                <div class="module-weight">weight: 7%</div>
+                                <div class="module-desc">Bot detection via engagement variance, like-reply ratios, and posting patterns.</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Dissonance</div>
+                                <div class="module-weight">weight: 7%</div>
+                                <div class="module-desc">Hypocrisy and tone inconsistency. Do they mock others for things they've done themselves?</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Transparency</div>
+                                <div class="module-weight">weight: 7%</div>
+                                <div class="module-desc">Sponsored content disclosure rates. Do they mark their paid shills?</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Follower Quality</div>
+                                <div class="module-weight">weight: 7%</div>
+                                <div class="module-desc">Estimates bot followers from engagement patterns and statistical signals.</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Temporal</div>
+                                <div class="module-weight">weight: 7%</div>
+                                <div class="module-desc">Timing vs price action. Are they front-running their audience?</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Linguistic</div>
+                                <div class="module-weight">weight: 7%</div>
+                                <div class="module-desc">Language authenticity and manipulation tactics detection.</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Accountability</div>
+                                <div class="module-weight">weight: 7%</div>
+                                <div class="module-desc">Do they own their Ls or cherry-pick wins? Responsibility and honesty.</div>
+                            </div>
+                            <div class="module-item">
+                                <div class="module-name">Network</div>
+                                <div class="module-weight">weight: 5%</div>
+                                <div class="module-desc">Reply guy behavior and interaction patterns with other accounts.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="paper-card" id="bs-meter">
+                    <div class="card-content">
+                        <div class="section-number">03</div>
+                        <h2 class="section-title">Contradiction Detection (BS Meter)</h2>
+                        <p class="section-text">
+                            The BS Meter specifically tracks flip-flops and contradictions. It looks for cases where someone said one thing, then did or said the opposite. This is separate from the main credibility score but gives you a quick read on consistency.
+                        </p>
+
+                        <p class="section-text" style="font-weight: 500; margin-top: 20px; margin-bottom: 12px;">
+                            We detect four types of contradictions:
+                        </p>
+
+                        <div class="detection-list">
+                            <div class="detection-item">
+                                <div class="detection-icon">1</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Holding Contradictions<span class="severity-badge severity-high">high impact</span></div>
+                                    <div class="detection-desc">Said "diamond hands" or "never selling" on a token, then sold within days. Detected by matching holding language ("hodl", "holding long term", "never sell") with selling language ("sold", "dumped", "exited", "took profits") on the same ticker.</div>
+                                </div>
+                            </div>
+                            <div class="detection-item">
+                                <div class="detection-icon">2</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Sentiment Contradictions<span class="severity-badge severity-high">high impact</span></div>
+                                    <div class="detection-desc">Flipped from bullish to bearish (or vice versa) on the same token. Uses keyword lists for bullish ("moon", "100x", "accumulating") and bearish ("dump", "crash", "avoid", "dead") sentiment.</div>
+                                </div>
+                            </div>
+                            <div class="detection-item">
+                                <div class="detection-icon">3</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Promotion Contradictions<span class="severity-badge severity-medium">medium impact</span></div>
+                                    <div class="detection-desc">Claimed content was "organic" or "not paid" but also posted clearly sponsored content (#ad, #sponsored). Flags within a 90-day window.</div>
+                                </div>
+                            </div>
+                            <div class="detection-item">
+                                <div class="detection-icon">4</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Advice Contradictions<span class="severity-badge severity-medium">medium impact</span></div>
+                                    <div class="detection-desc">Said "NFA" (not financial advice) but then gave direct trading orders like "buy now", "sell immediately", or made "guaranteed" claims.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="section-text" style="font-weight: 500; margin-top: 24px; margin-bottom: 12px;">
+                            Severity is based on timing:
+                        </p>
+
+                        <div class="highlight-box warning">
+                            <p class="highlight-text">
+                                <strong>High severity:</strong> Contradiction within 7 days (holding) or 3 days (sentiment)<br>
+                                <strong>Medium severity:</strong> Contradiction within 30 days (holding) or 14 days (sentiment)<br>
+                                <strong>Low severity:</strong> Longer timeframes or less impactful contradiction types
+                            </p>
+                        </div>
+
+                        <div class="formula-box">
+                            <div class="formula-text">BS Score Formula:
+
+weighted_score = (high_count x 10) + (medium_count x 5) + (low_count x 2)
+bs_score = min(100, (weighted_score / max(tweets/100, 1)) x 5)
+
+Example: 2 high + 3 medium contradictions on 200 tweets = ~35 BS score</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="paper-card" id="scoring">
+                    <div class="card-content">
+                        <div class="section-number">04</div>
+                        <h2 class="section-title">Scoring and Grades</h2>
+                        <p class="section-text">
+                            The final credibility score is a weighted sum of all 13 module scores. Each module contributes based on its assigned weight, and the result is a score from 0-100.
+                        </p>
+
+                        <div class="formula-box">
+                            <div class="formula-text">Overall Score = sum of (module_score x module_weight) for all 13 modules
+
+Weights sum to 100%:
+  Reputation (11%) + Consistency (9%) + Baiting (9%) + Prediction (9%) +
+  Privilege (8%) + Engagement (7%) + Dissonance (7%) + Transparency (7%) +
+  Follower Quality (7%) + Temporal (7%) + Linguistic (7%) +
+  Accountability (7%) + Network (5%) = 100%</div>
+                        </div>
+
+                        <p class="section-text" style="font-weight: 500; margin-top: 24px; margin-bottom: 12px;">
+                            Grades are assigned based on score thresholds:
+                        </p>
+
+                        <table class="grade-table">
+                            <thead>
+                                <tr>
+                                    <th>grade</th>
+                                    <th>score range</th>
+                                    <th>what it means</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="grade-badge grade-a">A</span></td>
+                                    <td>85-100</td>
+                                    <td>Actually decent. Rare to find.</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="grade-badge grade-b">B</span></td>
+                                    <td>70-84</td>
+                                    <td>Not completely mid. Above average.</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="grade-badge grade-c">C</span></td>
+                                    <td>55-69</td>
+                                    <td>Mid. As expected for most accounts.</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="grade-badge grade-d">D</span></td>
+                                    <td>40-54</td>
+                                    <td>Kinda sus. Proceed with caution.</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="grade-badge grade-f">F</span></td>
+                                    <td>0-39</td>
+                                    <td>Certified clown. Probably avoid.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="highlight-box success">
+                            <p class="highlight-text">
+                                <strong>Confidence score:</strong> We also provide a confidence percentage based on how much data we have. More tweets = higher confidence. The confidence is calculated from tweet count (50%), follower count (30%), and a base value (20%).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="paper-card" id="archetypes">
+                    <div class="card-content">
+                        <div class="section-number">05</div>
+                        <h2 class="section-title">Archetypes and Trust Levels</h2>
+                        <p class="section-text">
+                            Based on the analysis results, each account is classified into an archetype that summarizes their typical behavior pattern. This gives you a quick read on what kind of account you're dealing with.
+                        </p>
+                        <p class="section-text">
+                            Trust levels provide an actionable recommendation:
+                        </p>
+
+                        <div class="detection-list">
+                            <div class="detection-item">
+                                <div class="detection-icon" style="background: var(--success-soft); color: var(--success);">+</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Higher Trust</div>
+                                    <div class="detection-desc">Consistently good track record, transparent about sponsorships, owns their mistakes. Worth following for actual insight.</div>
+                                </div>
+                            </div>
+                            <div class="detection-item">
+                                <div class="detection-icon" style="background: var(--accent-soft); color: var(--accent);">~</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Consider / Neutral</div>
+                                    <div class="detection-desc">Mixed signals or not enough data. Do your own research on specific claims they make.</div>
+                                </div>
+                            </div>
+                            <div class="detection-item">
+                                <div class="detection-icon" style="background: var(--warning-soft); color: var(--warning);">!</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Caution / Entertainment Only</div>
+                                    <div class="detection-desc">Some red flags or primarily entertainment value. Don't base financial decisions on their content.</div>
+                                </div>
+                            </div>
+                            <div class="detection-item">
+                                <div class="detection-icon" style="background: var(--danger-soft); color: var(--danger);">x</div>
+                                <div class="detection-content">
+                                    <div class="detection-name">Avoid</div>
+                                    <div class="detection-desc">Multiple serious red flags. History of manipulation, scams, or consistent misleading content.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="paper-card" id="limitations">
+                    <div class="card-content">
+                        <div class="section-number">06</div>
+                        <h2 class="section-title">Limitations</h2>
+                        <p class="section-text">
+                            This tool is meant to be a starting point, not the final word. Here's what you should know:
+                        </p>
+
+                        <div class="highlight-box danger">
+                            <p class="highlight-text">
+                                <strong>Not financial advice.</strong> This is an analysis tool, not a recommendation engine. Always do your own research before making any financial decisions.
+                            </p>
+                        </div>
+
+                        <p class="section-text">
+                            <strong>Data limitations:</strong> We can only analyze public tweets. Private accounts, deleted tweets, and off-platform behavior aren't captured. The analysis is only as good as the data we can access.
+                        </p>
+                        <p class="section-text">
+                            <strong>Context matters:</strong> Automated analysis can miss nuance, sarcasm, or legitimate changes in opinion based on new information. A "contradiction" might actually be someone updating their view based on new data.
+                        </p>
+                        <p class="section-text">
+                            <strong>Gaming potential:</strong> Like any metric, this can potentially be gamed by sophisticated actors who understand the signals we look for. Use it as one input among many.
+                        </p>
+                        <p class="section-text">
+                            <strong>Point in time:</strong> Results reflect behavior up to the analysis date. People can change. A bad score from a year ago might not reflect current behavior.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <footer>
+                <a href="https://orynth.dev/projects/key-opinion-terminal" target="_blank" rel="noopener">
+                    <img src="https://orynth.dev/api/badge/key-opinion-terminal?theme=light&style=default" alt="Featured on Orynth" width="260" height="80" />
+                </a>
+            </footer>
+        </main>
+    </div>
+</body>
+</html>
