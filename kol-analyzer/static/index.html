@@ -1119,6 +1119,20 @@
             color: var(--text-muted);
         }
 
+        .beta-tag {
+            display: inline-block;
+            font-size: 9px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 6px;
+            background: var(--border);
+            color: var(--text-muted);
+            border-radius: 3px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
         @media (max-width: 768px) {
             .hero-title {
                 font-size: 48px;
@@ -1165,12 +1179,15 @@
                 <div class="logo-icon">k</div>
                 <div class="logo-text">kol terminal</div>
             </div>
+            <nav class="header-nav">
+                <a href="/docs.html" class="header-link">how it works</a>
+            </nav>
         </header>
 
         <main class="main">
             <div class="search-hero" id="search-hero">
                 <h1 class="hero-title">sup</h1>
-                <p class="hero-subtitle">lets see if ur fave influencer is legit. probably not tho</p>
+                <p class="hero-subtitle">lets see if ur fave influencer is legit. probably not tho <span class="beta-tag">beta</span></p>
 
                 <div class="search-container">
                     <div class="search-bar">
