@@ -3,12 +3,18 @@ Contradiction Analyzer
 
 Detects contradictory statements and actions in a KOL's tweet history.
 Finds instances where they say one thing and do/say the opposite.
+
+Enhanced with sentence embeddings (All-MiniLM-L6-v2) for semantic similarity
+detection of contradictions that may not match regex patterns.
 """
 
 import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -53,8 +59,12 @@ class ContradictionAnalysis:
     sentiment_contradictions: int = 0
     advice_contradictions: int = 0
 
+    # Semantic contradictions (ML-detected)
+    semantic_contradictions: int = 0
+    ml_available: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "contradiction_count": self.contradiction_count,
             "bs_score": self.bs_score,
             "holding_contradictions": self.holding_contradictions,
@@ -63,6 +73,11 @@ class ContradictionAnalysis:
             "advice_contradictions": self.advice_contradictions,
             "contradictions": [c.to_dict() for c in self.contradictions[:10]]  # Top 10
         }
+
+        if self.ml_available:
+            result["semantic_contradictions"] = self.semantic_contradictions
+
+        return result
 
 
 class ContradictionAnalyzer:
@@ -98,12 +113,153 @@ class ContradictionAnalyzer:
         (r'\b(buy now|sell now|last chance|don.t miss|hurry)\b', 'urgency'),
     ]
 
-    def __init__(self):
+    # Semantic contradiction threshold
+    SEMANTIC_SIMILARITY_THRESHOLD = 0.7  # High similarity needed
+    SEMANTIC_SENTIMENT_DIFF_THRESHOLD = 0.5  # Sentiment must differ significantly
+
+    def __init__(self, use_ml: bool = True):
+        """
+        Initialize the analyzer.
+
+        Args:
+            use_ml: Whether to use ML models for semantic contradiction detection
+        """
         # Compile patterns
         self.holding_re = [(re.compile(p, re.IGNORECASE), action) for p, action in self.HOLDING_PATTERNS]
         self.sentiment_re = [(re.compile(p, re.IGNORECASE), sentiment) for p, sentiment in self.SENTIMENT_PATTERNS]
         self.promotion_re = [(re.compile(p, re.IGNORECASE), ptype) for p, ptype in self.PROMOTION_PATTERNS]
         self.advice_re = [(re.compile(p, re.IGNORECASE), atype) for p, atype in self.ADVICE_PATTERNS]
+
+        self.use_ml = use_ml
+        self._ml_available = None
+        self._embeddings_cache = None
+
+    def _check_ml_available(self) -> bool:
+        """Check if ML models are available."""
+        if self._ml_available is None:
+            try:
+                from .ml_models import is_model_available
+                self._ml_available = (
+                    is_model_available('embeddings') and
+                    is_model_available('sentiment')
+                )
+            except ImportError:
+                self._ml_available = False
+        return self._ml_available
+
+    def _find_semantic_contradictions(
+        self,
+        tweets: List[Dict[str, Any]]
+    ) -> List[Contradiction]:
+        """
+        Find semantic contradictions using embeddings and sentiment.
+
+        This detects contradictions that regex patterns might miss by:
+        1. Finding tweets about similar topics (high embedding similarity)
+        2. Checking if they have opposite sentiments
+
+        Args:
+            tweets: List of tweet dicts
+
+        Returns:
+            List of detected contradictions
+        """
+        if not self.use_ml or not self._check_ml_available():
+            return []
+
+        try:
+            from .ml_models import get_embeddings, analyze_sentiment_batch
+            import numpy as np
+            from scipy.spatial.distance import cosine
+
+            # Get texts and filter
+            texts = [t.get('text', '') for t in tweets if t.get('text', '').strip()]
+            if len(texts) < 5:
+                return []
+
+            # Get embeddings
+            embeddings = get_embeddings(texts)
+            if embeddings is None:
+                return []
+
+            # Get sentiments
+            sentiments = analyze_sentiment_batch(texts)
+
+            contradictions = []
+            checked_pairs = set()
+
+            # Compare tweets for semantic contradictions
+            for i in range(len(texts)):
+                if sentiments[i] is None:
+                    continue
+
+                for j in range(i + 1, len(texts)):
+                    if sentiments[j] is None:
+                        continue
+
+                    # Skip if already checked
+                    pair_key = (min(i, j), max(i, j))
+                    if pair_key in checked_pairs:
+                        continue
+                    checked_pairs.add(pair_key)
+
+                    # Calculate similarity
+                    try:
+                        similarity = 1 - cosine(embeddings[i], embeddings[j])
+                    except Exception:
+                        continue
+
+                    # If tweets are semantically similar (same topic)
+                    if similarity < self.SEMANTIC_SIMILARITY_THRESHOLD:
+                        continue
+
+                    # Check if sentiments are opposite
+                    sent_i = sentiments[i]
+                    sent_j = sentiments[j]
+
+                    # Calculate sentiment difference
+                    pos_diff = abs(sent_i['positive'] - sent_j['positive'])
+                    neg_diff = abs(sent_i['negative'] - sent_j['negative'])
+
+                    # One positive, one negative
+                    is_contradiction = (
+                        (sent_i['positive'] > 0.5 and sent_j['negative'] > 0.5) or
+                        (sent_i['negative'] > 0.5 and sent_j['positive'] > 0.5) or
+                        (pos_diff > self.SEMANTIC_SENTIMENT_DIFF_THRESHOLD and
+                         neg_diff > self.SEMANTIC_SENTIMENT_DIFF_THRESHOLD)
+                    )
+
+                    if is_contradiction:
+                        # Find the original tweet dicts
+                        tweet_i = tweets[i]
+                        tweet_j = tweets[j]
+
+                        days_between = abs(self._days_between(tweet_i, tweet_j))
+
+                        # Determine severity based on time gap
+                        if days_between <= 7:
+                            severity = "high"
+                        elif days_between <= 30:
+                            severity = "medium"
+                        else:
+                            severity = "low"
+
+                        contradiction = Contradiction(
+                            severity=severity,
+                            original_tweet=tweet_i,
+                            contradicting_tweet=tweet_j,
+                            category="semantic",
+                            description=f"Semantically similar statements with opposing sentiments (similarity: {similarity:.2f})",
+                            time_between_days=days_between
+                        )
+                        contradictions.append(contradiction)
+
+            # Limit to top contradictions to avoid overwhelming results
+            return contradictions[:10]
+
+        except Exception as e:
+            logger.warning(f"Semantic contradiction detection failed: {e}")
+            return []
 
     def analyze(self, tweets: List[Dict[str, Any]], username: str = "") -> ContradictionAnalysis:
         """Analyze tweets for contradictions."""
@@ -256,6 +412,22 @@ class ContradictionAnalyzer:
                     )
                     result.contradictions.append(contradiction)
                     result.advice_contradictions += 1
+
+        # Find semantic contradictions using ML
+        semantic_contradictions = self._find_semantic_contradictions(sorted_tweets)
+        if semantic_contradictions:
+            result.ml_available = True
+            result.semantic_contradictions = len(semantic_contradictions)
+            # Add semantic contradictions to the list
+            for sc in semantic_contradictions:
+                # Avoid duplicates (if regex already caught it)
+                is_duplicate = any(
+                    c.original_tweet.get('id') == sc.original_tweet.get('id') and
+                    c.contradicting_tweet.get('id') == sc.contradicting_tweet.get('id')
+                    for c in result.contradictions
+                )
+                if not is_duplicate:
+                    result.contradictions.append(sc)
 
         # Sort contradictions by severity and recency
         severity_order = {"high": 0, "medium": 1, "low": 2}

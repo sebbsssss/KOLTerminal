@@ -7,13 +7,18 @@ Detects:
 - Emotional manipulation: Fear/greed triggers
 - Authenticity drift: Style changes (ghostwriter detection)
 - Copy-paste patterns: Repeated templates
+
+Enhanced with SpaCy NLP for more accurate linguistic analysis.
 """
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, Any
 from collections import Counter
 import statistics
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CertaintyLevel:
@@ -67,8 +72,17 @@ class LinguisticReport:
     red_flags: List[str] = field(default_factory=list)
     green_flags: List[str] = field(default_factory=list)
 
+    # NLP-enhanced metrics (SpaCy)
+    ml_available: bool = False
+    avg_sentence_length: float = 0.0
+    noun_phrase_density: float = 0.0
+    verb_density: float = 0.0
+    adjective_density: float = 0.0
+    named_entities: List[Dict[str, Any]] = field(default_factory=list)
+    key_topics: List[str] = field(default_factory=list)
+
     def to_dict(self) -> dict:
-        return {
+        result = {
             'authenticity_score': round(self.authenticity_score, 1),
             'certainty_calibration': self.certainty_calibration,
             'avg_certainty_level': round(self.avg_certainty_level, 1),
@@ -94,6 +108,18 @@ class LinguisticReport:
             'red_flags': self.red_flags,
             'green_flags': self.green_flags
         }
+
+        if self.ml_available:
+            result['nlp_analysis'] = {
+                'avg_sentence_length': round(self.avg_sentence_length, 1),
+                'noun_phrase_density': round(self.noun_phrase_density, 3),
+                'verb_density': round(self.verb_density, 3),
+                'adjective_density': round(self.adjective_density, 3),
+                'named_entities': self.named_entities[:20],
+                'key_topics': self.key_topics[:10]
+            }
+
+        return result
 
 
 class LinguisticAnalyzer:
@@ -171,7 +197,13 @@ class LinguisticAnalyzer:
         r'(like.*retweet|rt.*follow)',
     ]
 
-    def __init__(self):
+    def __init__(self, use_ml: bool = True):
+        """
+        Initialize the analyzer.
+
+        Args:
+            use_ml: Whether to use ML models (SpaCy) for NLP analysis
+        """
         self.absolute_patterns = [re.compile(p, re.IGNORECASE) for p in self.ABSOLUTE_CERTAINTY]
         self.high_cert_patterns = [re.compile(p, re.IGNORECASE) for p in self.HIGH_CERTAINTY]
         self.hedge_patterns = [re.compile(p, re.IGNORECASE) for p in self.HEDGED_LANGUAGE]
@@ -181,6 +213,114 @@ class LinguisticAnalyzer:
         self.jargon_patterns = [re.compile(p, re.IGNORECASE) for p in self.CRYPTO_JARGON]
         self.template_patterns = [re.compile(p, re.IGNORECASE) for p in self.TEMPLATE_PATTERNS]
         self.emoji_pattern = re.compile(r'[\U0001F300-\U0001F9FF]')
+
+        self.use_ml = use_ml
+        self._ml_available = None
+        self._nlp = None
+
+    def _check_ml_available(self) -> bool:
+        """Check if SpaCy is available."""
+        if self._ml_available is None:
+            try:
+                from .ml_models import is_model_available
+                self._ml_available = is_model_available('spacy')
+            except ImportError:
+                self._ml_available = False
+        return self._ml_available
+
+    def _get_nlp(self):
+        """Get SpaCy NLP model."""
+        if self._nlp is None and self._check_ml_available():
+            try:
+                from .ml_models import get_spacy_nlp
+                self._nlp = get_spacy_nlp()
+            except Exception as e:
+                logger.warning(f"Failed to get SpaCy model: {e}")
+        return self._nlp
+
+    def _analyze_with_spacy(self, texts: List[str]) -> Optional[Dict[str, Any]]:
+        """
+        Analyze texts using SpaCy NLP.
+
+        Args:
+            texts: List of tweet texts
+
+        Returns:
+            Dict with NLP metrics or None
+        """
+        if not self.use_ml or not self._check_ml_available():
+            return None
+
+        nlp = self._get_nlp()
+        if nlp is None:
+            return None
+
+        try:
+            combined_text = ' '.join(texts)
+            # Limit text length for performance
+            if len(combined_text) > 100000:
+                combined_text = combined_text[:100000]
+
+            doc = nlp(combined_text)
+
+            # Count POS tags
+            pos_counts = Counter()
+            total_tokens = 0
+            for token in doc:
+                if not token.is_punct and not token.is_space:
+                    pos_counts[token.pos_] += 1
+                    total_tokens += 1
+
+            # Calculate densities
+            noun_count = pos_counts.get('NOUN', 0) + pos_counts.get('PROPN', 0)
+            verb_count = pos_counts.get('VERB', 0)
+            adj_count = pos_counts.get('ADJ', 0)
+
+            noun_density = noun_count / max(1, total_tokens)
+            verb_density = verb_count / max(1, total_tokens)
+            adj_density = adj_count / max(1, total_tokens)
+
+            # Sentence analysis
+            sentences = list(doc.sents)
+            avg_sent_len = sum(len(list(s)) for s in sentences) / max(1, len(sentences))
+
+            # Named entities
+            entity_counts = Counter()
+            entities = []
+            for ent in doc.ents:
+                entity_key = (ent.text.lower(), ent.label_)
+                entity_counts[entity_key] += 1
+
+            # Get top entities
+            for (text, label), count in entity_counts.most_common(20):
+                entities.append({
+                    'text': text,
+                    'label': label,
+                    'count': count
+                })
+
+            # Key noun phrases (topics)
+            noun_chunk_counts = Counter()
+            for chunk in doc.noun_chunks:
+                chunk_text = chunk.text.lower().strip()
+                if len(chunk_text) > 3:  # Filter short phrases
+                    noun_chunk_counts[chunk_text] += 1
+
+            key_topics = [phrase for phrase, _ in noun_chunk_counts.most_common(10)]
+
+            return {
+                'avg_sentence_length': avg_sent_len,
+                'noun_phrase_density': noun_density,
+                'verb_density': verb_density,
+                'adjective_density': adj_density,
+                'named_entities': entities,
+                'key_topics': key_topics,
+                'pos_distribution': dict(pos_counts)
+            }
+
+        except Exception as e:
+            logger.warning(f"SpaCy analysis failed: {e}")
+            return None
 
     def analyze(self, tweets: List[dict]) -> LinguisticReport:
         """Analyze linguistic patterns across tweets."""
@@ -280,7 +420,8 @@ class LinguisticAnalyzer:
             certainty_calibration, style_variance
         )
 
-        return LinguisticReport(
+        # Create base report
+        report = LinguisticReport(
             authenticity_score=authenticity_score,
             certainty_calibration=certainty_calibration,
             avg_certainty_level=avg_certainty,
@@ -306,6 +447,27 @@ class LinguisticAnalyzer:
             red_flags=red_flags,
             green_flags=green_flags
         )
+
+        # Add SpaCy NLP analysis if available
+        nlp_results = self._analyze_with_spacy(all_text)
+        if nlp_results:
+            report.ml_available = True
+            report.avg_sentence_length = nlp_results.get('avg_sentence_length', 0)
+            report.noun_phrase_density = nlp_results.get('noun_phrase_density', 0)
+            report.verb_density = nlp_results.get('verb_density', 0)
+            report.adjective_density = nlp_results.get('adjective_density', 0)
+            report.named_entities = nlp_results.get('named_entities', [])
+            report.key_topics = nlp_results.get('key_topics', [])
+
+            # Add NLP-based patterns
+            if report.noun_phrase_density > 0.15:
+                report.patterns_detected.append("Noun-heavy writing style (informative)")
+            if report.verb_density > 0.12:
+                report.patterns_detected.append("Action-oriented language")
+            if report.adjective_density > 0.08:
+                report.patterns_detected.append("Descriptive/persuasive language")
+
+        return report
 
     def _analyze_single_tweet(self, text: str) -> Dict:
         """Analyze a single tweet."""

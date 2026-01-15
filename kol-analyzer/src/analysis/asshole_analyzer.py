@@ -3,12 +3,17 @@ Asshole Meter Analyzer
 
 Measures how toxic, rude, or unpleasant a KOL is in their communications.
 This analyzes personality/behavior rather than credibility.
+
+Enhanced with Detoxify neural toxicity detection for more accurate analysis.
 """
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import Counter
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -25,6 +30,15 @@ class AssholeAnalysis:
     empathy_score: float = 100.0  # Higher = more empathetic (inverted for final)
     dismissiveness_score: float = 0.0
 
+    # ML-based toxicity scores (from Detoxify)
+    ml_toxicity_score: float = 0.0
+    ml_severe_toxicity: float = 0.0
+    ml_obscene: float = 0.0
+    ml_threat: float = 0.0
+    ml_insult: float = 0.0
+    ml_identity_attack: float = 0.0
+    ml_available: bool = False
+
     # Detected patterns
     toxic_phrases: List[str] = field(default_factory=list)
     ego_phrases: List[str] = field(default_factory=list)
@@ -34,7 +48,7 @@ class AssholeAnalysis:
     personality_summary: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "asshole_score": self.asshole_score,
             "toxicity_level": self.toxicity_level,
             "toxicity_emoji": self.toxicity_emoji,
@@ -48,6 +62,19 @@ class AssholeAnalysis:
             "helpful_phrases": self.helpful_phrases[:10],
             "personality_summary": self.personality_summary
         }
+
+        # Add ML scores if available
+        if self.ml_available:
+            result["ml_toxicity"] = {
+                "toxicity": self.ml_toxicity_score,
+                "severe_toxicity": self.ml_severe_toxicity,
+                "obscene": self.ml_obscene,
+                "threat": self.ml_threat,
+                "insult": self.ml_insult,
+                "identity_attack": self.ml_identity_attack
+            }
+
+        return result
 
 
 class AssholeAnalyzer:
@@ -122,7 +149,13 @@ class AssholeAnalyzer:
         r'\b(be careful|stay safe|manage (risk|your position))\b',
     ]
 
-    def __init__(self):
+    def __init__(self, use_ml: bool = True):
+        """
+        Initialize the analyzer.
+
+        Args:
+            use_ml: Whether to use ML models (Detoxify) for toxicity detection
+        """
         # Compile patterns for efficiency
         self.insult_re = [re.compile(p, re.IGNORECASE) for p in self.INSULT_PATTERNS]
         self.condescension_re = [re.compile(p, re.IGNORECASE) for p in self.CONDESCENSION_PATTERNS]
@@ -130,6 +163,53 @@ class AssholeAnalyzer:
         self.low_empathy_re = [re.compile(p, re.IGNORECASE) for p in self.LOW_EMPATHY_PATTERNS]
         self.dismissive_re = [re.compile(p, re.IGNORECASE) for p in self.DISMISSIVE_PATTERNS]
         self.helpful_re = [re.compile(p, re.IGNORECASE) for p in self.HELPFUL_PATTERNS]
+
+        self.use_ml = use_ml
+        self._ml_available = None  # Lazy check
+
+    def _check_ml_available(self) -> bool:
+        """Check if ML models are available."""
+        if self._ml_available is None:
+            try:
+                from .ml_models import is_model_available
+                self._ml_available = is_model_available('detoxify')
+            except ImportError:
+                self._ml_available = False
+        return self._ml_available
+
+    def _analyze_toxicity_ml(self, texts: List[str]) -> Optional[Dict[str, float]]:
+        """
+        Analyze toxicity using Detoxify ML model.
+
+        Args:
+            texts: List of tweet texts
+
+        Returns:
+            Dict with average toxicity scores or None if ML not available
+        """
+        if not self.use_ml or not self._check_ml_available():
+            return None
+
+        try:
+            from .ml_models import analyze_toxicity_batch
+
+            results = analyze_toxicity_batch(texts)
+
+            # Filter out None results
+            valid_results = [r for r in results if r is not None]
+            if not valid_results:
+                return None
+
+            # Average the scores
+            avg_scores = {}
+            for key in valid_results[0].keys():
+                avg_scores[key] = sum(r.get(key, 0) for r in valid_results) / len(valid_results)
+
+            return avg_scores
+
+        except Exception as e:
+            logger.warning(f"ML toxicity analysis failed: {e}")
+            return None
 
     def analyze(self, tweets: List[Dict[str, Any]], username: str = "") -> AssholeAnalysis:
         """Analyze tweets for asshole behavior."""
@@ -233,6 +313,30 @@ class AssholeAnalyzer:
         # Bonus reduction for helpful behavior
         helpful_bonus = min(20, (helpful_count / total_tweets) * 100)
         raw_score = max(0, raw_score - helpful_bonus)
+
+        # ML-based toxicity analysis (if available)
+        tweet_texts = [t.get('text', '') for t in tweets if t.get('text')]
+        ml_scores = self._analyze_toxicity_ml(tweet_texts)
+
+        if ml_scores:
+            result.ml_available = True
+            result.ml_toxicity_score = ml_scores.get('toxicity', 0) * 100
+            result.ml_severe_toxicity = ml_scores.get('severe_toxicity', 0) * 100
+            result.ml_obscene = ml_scores.get('obscene', 0) * 100
+            result.ml_threat = ml_scores.get('threat', 0) * 100
+            result.ml_insult = ml_scores.get('insult', 0) * 100
+            result.ml_identity_attack = ml_scores.get('identity_attack', 0) * 100
+
+            # Combine regex-based score with ML score (weighted average)
+            # ML gets 60% weight as it's more comprehensive
+            ml_combined = (
+                result.ml_toxicity_score * 0.3 +
+                result.ml_insult * 0.3 +
+                result.ml_severe_toxicity * 0.2 +
+                result.ml_identity_attack * 0.1 +
+                result.ml_obscene * 0.1
+            )
+            raw_score = raw_score * 0.4 + ml_combined * 0.6
 
         result.asshole_score = min(100, max(0, raw_score))
 
