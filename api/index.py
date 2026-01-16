@@ -178,6 +178,18 @@ async def admin_page():
     )
 
 
+@app.get("/docs.html", response_class=HTMLResponse, include_in_schema=False)
+async def docs_page():
+    """Serve the documentation page."""
+    static_file = kol_analyzer_dir / "static" / "docs.html"
+    if static_file.exists():
+        return HTMLResponse(content=static_file.read_text(), status_code=200)
+    return HTMLResponse(
+        content="<html><body><h1>Documentation not found</h1></body></html>",
+        status_code=404
+    )
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint with diagnostic info."""

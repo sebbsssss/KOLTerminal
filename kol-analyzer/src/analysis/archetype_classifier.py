@@ -2,11 +2,16 @@
 Archetype Classifier - Classify KOLs into recognizable personas based on behavior patterns.
 
 Instead of just scores, this gives users an intuitive understanding of WHO they're dealing with.
+
+Enhanced with zero-shot classification for more nuanced archetype detection.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Archetype(Enum):
@@ -52,8 +57,13 @@ class ArchetypeProfile:
     evolution_stage: str  # "early", "rising", "established", "evolved", "declining"
     evolution_warning: Optional[str]  # e.g., "Shows early signs of guru syndrome"
 
+    # ML-enhanced classification
+    ml_available: bool = False
+    ml_classification: Optional[Dict[str, float]] = None
+    content_themes: List[str] = field(default_factory=list)
+
     def to_dict(self) -> dict:
-        return {
+        result = {
             'primary_archetype': self.primary_archetype.value,
             'secondary_archetype': self.secondary_archetype.value if self.secondary_archetype else None,
             'confidence': round(self.confidence, 1),
@@ -67,6 +77,12 @@ class ArchetypeProfile:
             'evolution_stage': self.evolution_stage,
             'evolution_warning': self.evolution_warning
         }
+
+        if self.ml_available:
+            result['ml_classification'] = self.ml_classification
+            result['content_themes'] = self.content_themes
+
+        return result
 
 
 # Archetype definitions with trait weights
@@ -312,10 +328,128 @@ ARCHETYPE_DEFINITIONS = {
 class ArchetypeClassifier:
     """
     Classifies KOLs into archetypes based on their analysis scores.
+
+    Enhanced with zero-shot classification for content-based archetype detection.
     """
 
-    def __init__(self):
-        pass
+    # Labels for zero-shot classification
+    CONTENT_LABELS = [
+        "educational content",
+        "market analysis",
+        "promotional shilling",
+        "entertainment and memes",
+        "personal journey sharing",
+        "insider alpha leaks",
+        "airdrop farming content",
+        "philosophical wisdom"
+    ]
+
+    ARCHETYPE_LABELS = [
+        "guru dispensing wisdom",
+        "honest grinder in trenches",
+        "paid shill promoter",
+        "data-driven analyst",
+        "entertainer and memer",
+        "points farmer optimizer",
+        "connected insider",
+        "newcomer learning"
+    ]
+
+    def __init__(self, use_ml: bool = True):
+        """
+        Initialize the classifier.
+
+        Args:
+            use_ml: Whether to use ML models for classification
+        """
+        self.use_ml = use_ml
+        self._ml_available = None
+
+    def _check_ml_available(self) -> bool:
+        """Check if zero-shot classifier is available."""
+        if self._ml_available is None:
+            try:
+                from .ml_models import is_model_available
+                self._ml_available = is_model_available('zero_shot')
+            except ImportError:
+                self._ml_available = False
+        return self._ml_available
+
+    def _classify_content_zero_shot(
+        self,
+        sample_tweets: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Classify content using zero-shot classification.
+
+        Args:
+            sample_tweets: List of sample tweet texts
+
+        Returns:
+            Dict with classification results or None
+        """
+        if not self.use_ml or not self._check_ml_available():
+            return None
+
+        if not sample_tweets:
+            return None
+
+        try:
+            from .ml_models import classify_zero_shot
+
+            # Combine sample tweets for classification
+            combined = ' '.join(sample_tweets[:20])  # Limit to 20 tweets
+            if len(combined) > 2000:
+                combined = combined[:2000]
+
+            # Classify content themes
+            content_result = classify_zero_shot(combined, self.CONTENT_LABELS)
+
+            # Classify archetype directly
+            archetype_result = classify_zero_shot(combined, self.ARCHETYPE_LABELS)
+
+            if content_result and archetype_result:
+                return {
+                    'content_themes': content_result,
+                    'archetype_classification': archetype_result
+                }
+
+        except Exception as e:
+            logger.warning(f"Zero-shot classification failed: {e}")
+
+        return None
+
+    def _map_zero_shot_to_archetype(
+        self,
+        classification: Dict[str, float]
+    ) -> Dict[str, float]:
+        """
+        Map zero-shot archetype labels to archetype enum values.
+
+        Args:
+            classification: Zero-shot classification results
+
+        Returns:
+            Dict mapping archetype values to scores
+        """
+        mapping = {
+            "guru dispensing wisdom": "the_guru",
+            "honest grinder in trenches": "the_grinder",
+            "paid shill promoter": "the_shill",
+            "data-driven analyst": "the_analyst",
+            "entertainer and memer": "the_entertainer",
+            "points farmer optimizer": "the_farmer",
+            "connected insider": "the_insider",
+            "newcomer learning": "the_newcomer"
+        }
+
+        result = {}
+        for label, score in classification.items():
+            archetype_key = mapping.get(label)
+            if archetype_key:
+                result[archetype_key] = score * 100  # Convert to 0-100 scale
+
+        return result
 
     def classify(
         self,
@@ -334,22 +468,74 @@ class ArchetypeClassifier:
         privilege_report: dict = None,
         baiting_report: dict = None,
         sponsored_report: dict = None,
-        prediction_report: dict = None
+        prediction_report: dict = None,
+        # NEW: Tweet texts for ML classification
+        tweet_texts: List[str] = None
     ) -> ArchetypeProfile:
         """
         Classify a KOL into an archetype based on their scores.
+
+        Args:
+            engagement_score: Engagement authenticity score
+            consistency_score: Position consistency score
+            dissonance_score: Hypocrisy detection score
+            baiting_score: Engagement bait score
+            privilege_score: Privilege awareness score
+            prediction_score: Prediction accuracy score
+            transparency_score: Transparency score
+            follower_quality_score: Follower quality score
+            follower_count: Number of followers
+            tweet_count: Number of tweets
+            account_age_days: Account age in days
+            privilege_report: Detailed privilege report
+            baiting_report: Detailed baiting report
+            sponsored_report: Detailed sponsored content report
+            prediction_report: Detailed prediction report
+            tweet_texts: List of tweet texts for ML classification
+
+        Returns:
+            ArchetypeProfile with classification results
         """
         # Check for newcomer first
         if tweet_count < 50 or follower_count < 1000:
             return self._create_newcomer_profile(follower_count, tweet_count)
 
-        # Calculate archetype scores
+        # Calculate archetype scores from metrics
         archetype_scores = self._calculate_archetype_scores(
             engagement_score, consistency_score, dissonance_score,
             baiting_score, privilege_score, prediction_score,
             transparency_score, follower_quality_score,
             follower_count, baiting_report, sponsored_report
         )
+
+        # Try ML-based classification
+        ml_result = None
+        ml_archetype_scores = None
+        content_themes = []
+
+        if tweet_texts:
+            ml_result = self._classify_content_zero_shot(tweet_texts)
+            if ml_result:
+                ml_archetype_scores = self._map_zero_shot_to_archetype(
+                    ml_result.get('archetype_classification', {})
+                )
+                # Get top content themes
+                content_result = ml_result.get('content_themes', {})
+                content_themes = sorted(
+                    content_result.keys(),
+                    key=lambda k: content_result[k],
+                    reverse=True
+                )[:3]
+
+        # Combine ML and metric-based scores (if ML available)
+        if ml_archetype_scores:
+            # Weighted combination: 40% ML, 60% metrics
+            for key in archetype_scores:
+                if key in ml_archetype_scores:
+                    archetype_scores[key] = (
+                        archetype_scores[key] * 0.6 +
+                        ml_archetype_scores[key] * 0.4
+                    )
 
         # Find primary and secondary archetypes
         sorted_archetypes = sorted(
@@ -380,7 +566,7 @@ class ArchetypeClassifier:
             account_age_days, archetype_scores
         )
 
-        return ArchetypeProfile(
+        profile = ArchetypeProfile(
             primary_archetype=primary_archetype,
             secondary_archetype=secondary_archetype,
             confidence=confidence,
@@ -397,6 +583,14 @@ class ArchetypeClassifier:
             evolution_stage=evolution_stage,
             evolution_warning=evolution_warning
         )
+
+        # Add ML classification if available
+        if ml_result:
+            profile.ml_available = True
+            profile.ml_classification = ml_result.get('archetype_classification')
+            profile.content_themes = content_themes
+
+        return profile
 
     def _calculate_archetype_scores(
         self,

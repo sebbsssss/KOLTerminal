@@ -230,12 +230,20 @@ class CredibilityEngine:
         'F': 'POOR CREDIBILITY'
     }
 
-    def __init__(self, weights: Optional[Dict[str, float]] = None):
+    def __init__(self, weights: Optional[Dict[str, float]] = None, use_ml: bool = True):
+        """
+        Initialize the credibility engine.
+
+        Args:
+            weights: Optional custom weights for scoring modules
+            use_ml: Whether to use ML models for enhanced analysis
+        """
         self.weights = weights or self.DEFAULT_WEIGHTS
+        self.use_ml = use_ml
 
         # Initialize all analyzers (original)
         self.engagement_analyzer = EngagementAnalyzer()
-        self.consistency_tracker = ConsistencyTracker()
+        self.consistency_tracker = ConsistencyTracker(use_ml=use_ml)
         self.dissonance_analyzer = DissonanceAnalyzer()
         self.bait_analyzer = EngagementBaitAnalyzer()
 
@@ -247,21 +255,21 @@ class CredibilityEngine:
 
         # Initialize depth analyzers
         self.temporal_analyzer = TemporalAnalyzer()
-        self.linguistic_analyzer = LinguisticAnalyzer()
+        self.linguistic_analyzer = LinguisticAnalyzer(use_ml=use_ml)
         self.accountability_tracker = AccountabilityTracker()
         self.network_analyzer = NetworkAnalyzer()
 
         # Initialize reputation analyzer (what others say)
         self.reputation_analyzer = ReputationAnalyzer()
 
-        # Initialize asshole analyzer (personality/toxicity)
-        self.asshole_analyzer = AssholeAnalyzer()
+        # Initialize asshole analyzer (personality/toxicity) - ML enhanced
+        self.asshole_analyzer = AssholeAnalyzer(use_ml=use_ml)
 
-        # Initialize contradiction analyzer (BS detection)
-        self.contradiction_analyzer = ContradictionAnalyzer()
+        # Initialize contradiction analyzer (BS detection) - ML enhanced
+        self.contradiction_analyzer = ContradictionAnalyzer(use_ml=use_ml)
 
-        # Archetype classifier
-        self.archetype_classifier = ArchetypeClassifier()
+        # Archetype classifier - ML enhanced
+        self.archetype_classifier = ArchetypeClassifier(use_ml=use_ml)
 
     def analyze(
         self,
@@ -418,7 +426,8 @@ class CredibilityEngine:
         # Filter out contradictory flags to prevent confusing results
         red_flags, green_flags = self._filter_contradictory_flags(red_flags, green_flags)
 
-        # Classify archetype
+        # Classify archetype (pass tweet texts for ML classification)
+        tweet_texts = [t.get('text', '') for t in tweets if t.get('text')]
         archetype_profile = self.archetype_classifier.classify(
             engagement_score=engagement_score,
             consistency_score=consistency_score,
@@ -434,7 +443,8 @@ class CredibilityEngine:
             privilege_report=privilege_report.to_dict(),
             baiting_report=baiting_report.to_dict(),
             sponsored_report=sponsored_report.to_dict(),
-            prediction_report=prediction_report.to_dict()
+            prediction_report=prediction_report.to_dict(),
+            tweet_texts=tweet_texts  # Pass tweet texts for ML classification
         )
 
         # Get archetype metadata

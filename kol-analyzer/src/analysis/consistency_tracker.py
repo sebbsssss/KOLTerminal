@@ -1,5 +1,7 @@
 """
 Consistency Tracker - Track position changes on tokens/topics for flip detection.
+
+Enhanced with Twitter RoBERTa sentiment model for more accurate sentiment classification.
 """
 
 import re
@@ -7,6 +9,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Sentiment(Enum):
@@ -124,7 +129,13 @@ class ConsistencyTracker:
     FLIP_PENALTY_MINOR = 3.0
     SELF_ACKNOWLEDGED_REDUCTION = 0.5  # 50% reduction for transparency
 
-    def __init__(self):
+    def __init__(self, use_ml: bool = True):
+        """
+        Initialize the tracker.
+
+        Args:
+            use_ml: Whether to use ML models for sentiment classification
+        """
         self.bullish_pattern = re.compile(
             r'\b(' + '|'.join(self.BULLISH_KEYWORDS) + r')\b',
             re.IGNORECASE
@@ -137,6 +148,71 @@ class ConsistencyTracker:
         self.acknowledgment_patterns = [
             re.compile(p, re.IGNORECASE) for p in self.ACKNOWLEDGMENT_PATTERNS
         ]
+
+        self.use_ml = use_ml
+        self._ml_available = None
+        self._sentiment_cache: Dict[str, Dict[str, float]] = {}
+
+    def _check_ml_available(self) -> bool:
+        """Check if ML sentiment model is available."""
+        if self._ml_available is None:
+            try:
+                from .ml_models import is_model_available
+                self._ml_available = is_model_available('sentiment')
+            except ImportError:
+                self._ml_available = False
+        return self._ml_available
+
+    def _get_ml_sentiment(self, text: str) -> Optional[Dict[str, float]]:
+        """
+        Get ML-based sentiment scores for text.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            Dict with 'positive', 'negative', 'neutral' scores or None
+        """
+        if not self.use_ml or not self._check_ml_available():
+            return None
+
+        # Check cache
+        if text in self._sentiment_cache:
+            return self._sentiment_cache[text]
+
+        try:
+            from .ml_models import analyze_sentiment
+            result = analyze_sentiment(text)
+            if result:
+                self._sentiment_cache[text] = result
+            return result
+        except Exception as e:
+            logger.warning(f"ML sentiment analysis failed: {e}")
+            return None
+
+    def _preload_sentiments(self, texts: List[str]) -> None:
+        """
+        Preload sentiment scores for multiple texts (batch processing).
+
+        Args:
+            texts: List of texts to analyze
+        """
+        if not self.use_ml or not self._check_ml_available():
+            return
+
+        # Filter out already cached texts
+        uncached = [t for t in texts if t not in self._sentiment_cache]
+        if not uncached:
+            return
+
+        try:
+            from .ml_models import analyze_sentiment_batch
+            results = analyze_sentiment_batch(uncached)
+            for text, result in zip(uncached, results):
+                if result:
+                    self._sentiment_cache[text] = result
+        except Exception as e:
+            logger.warning(f"Batch sentiment preloading failed: {e}")
 
     def analyze(self, tweets: List[dict]) -> ConsistencyReport:
         """
@@ -160,6 +236,10 @@ class ConsistencyTracker:
             key=lambda t: t.get('timestamp', ''),
             reverse=False
         )
+
+        # Preload ML sentiments for efficiency (batch processing)
+        tweet_texts = [t.get('text', '') for t in sorted_tweets if t.get('text')]
+        self._preload_sentiments(tweet_texts)
 
         # Track positions over time: {ticker: [(sentiment, tweet_id, timestamp, text)]}
         position_history: Dict[str, List[Tuple[Sentiment, str, str, str]]] = {}
@@ -286,18 +366,60 @@ class ConsistencyTracker:
         )
 
     def _classify_sentiment(self, text: str) -> Sentiment:
-        """Classify the sentiment of a tweet."""
+        """
+        Classify the sentiment of a tweet.
+
+        Uses ML-based sentiment when available, with keyword fallback for
+        crypto-specific context (bullish/bearish on specific tokens).
+        """
         text_lower = text.lower()
 
+        # First, check keyword-based sentiment (crypto-specific)
         bullish_matches = len(self.bullish_pattern.findall(text_lower))
         bearish_matches = len(self.bearish_pattern.findall(text_lower))
 
-        if bullish_matches > bearish_matches:
-            return Sentiment.BULLISH
-        elif bearish_matches > bullish_matches:
-            return Sentiment.BEARISH
+        # If we have clear keyword signals, use them
+        if bullish_matches > 0 or bearish_matches > 0:
+            if bullish_matches > bearish_matches:
+                keyword_sentiment = Sentiment.BULLISH
+            elif bearish_matches > bullish_matches:
+                keyword_sentiment = Sentiment.BEARISH
+            else:
+                keyword_sentiment = Sentiment.NEUTRAL
         else:
-            return Sentiment.NEUTRAL
+            keyword_sentiment = None
+
+        # Try ML-based sentiment for additional context
+        ml_scores = self._get_ml_sentiment(text)
+
+        if ml_scores:
+            pos = ml_scores.get('positive', 0)
+            neg = ml_scores.get('negative', 0)
+            neu = ml_scores.get('neutral', 0)
+
+            # Determine ML sentiment
+            if pos > neg and pos > 0.4:
+                ml_sentiment = Sentiment.BULLISH
+            elif neg > pos and neg > 0.4:
+                ml_sentiment = Sentiment.BEARISH
+            else:
+                ml_sentiment = Sentiment.NEUTRAL
+
+            # Combine: keyword sentiment takes priority if present
+            # (because it's crypto-specific), ML adds confidence
+            if keyword_sentiment is not None:
+                # If both agree, we're confident
+                # If they disagree, trust keywords (crypto-specific)
+                return keyword_sentiment
+            else:
+                # No keyword signal, use ML
+                return ml_sentiment
+
+        # Fallback to keyword-only
+        if keyword_sentiment is not None:
+            return keyword_sentiment
+
+        return Sentiment.NEUTRAL
 
     def _check_acknowledgment(self, text: str) -> bool:
         """Check if a tweet acknowledges a position change."""

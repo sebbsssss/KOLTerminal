@@ -17,6 +17,10 @@
       "dest": "/api/index.py"
     },
     {
+      "src": "/docs.html",
+      "dest": "/api/index.py"
+    },
+    {
       "src": "/redoc",
       "dest": "/api/index.py"
     },
