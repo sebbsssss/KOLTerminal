@@ -88,6 +88,37 @@ try:
 except Exception as e:
     import_errors.append(f"SupabaseDatabase: {e}")
 
+# Import Nansen client (direct import to avoid triggering api/__init__.py)
+NansenClient = None
+nansen_client = None
+try:
+    import importlib.util
+    nansen_module_path = src_dir / "api" / "nansen_client.py"
+    if nansen_module_path.exists():
+        spec = importlib.util.spec_from_file_location("nansen_client", nansen_module_path)
+        nansen_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nansen_module)
+        NansenClient = nansen_module.NansenClient
+        nansen_api_key = os.environ.get("NANSEN_API_KEY")
+        if nansen_api_key:
+            nansen_client = NansenClient(api_key=nansen_api_key)
+    else:
+        import_errors.append(f"NansenClient: nansen_client.py not found at {nansen_module_path}")
+except Exception as e:
+    import_errors.append(f"NansenClient: {e}")
+
+# Import Wallet Analyzer
+WalletAnalyzer = None
+try:
+    wallet_analyzer_path = src_dir / "analysis" / "wallet_analyzer.py"
+    if wallet_analyzer_path.exists():
+        spec = importlib.util.spec_from_file_location("wallet_analyzer", wallet_analyzer_path)
+        wallet_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(wallet_module)
+        WalletAnalyzer = wallet_module.WalletAnalyzer
+except Exception as e:
+    import_errors.append(f"WalletAnalyzer: {e}")
+
 # Import and setup admin router
 try:
     from admin import router as admin_router, set_db as admin_set_db, set_admin_password
@@ -103,10 +134,19 @@ except Exception as e:
 
 
 # Pydantic models
+class WalletAddress(BaseModel):
+    address: str = Field(..., description="Wallet address (0x... or Solana address)")
+    chain: str = Field(default="ethereum", description="Blockchain (ethereum, solana, base, etc.)")
+
+
 class AnalyzeRequest(BaseModel):
     username: str = Field(..., description="Twitter username to analyze")
     max_tweets: int = Field(1000, description="Maximum tweets to analyze", ge=10, le=2000)
     force_refresh: bool = Field(False, description="Force re-analysis even if cached")
+    wallet_addresses: Optional[List[WalletAddress]] = Field(
+        default=None,
+        description="Optional wallet addresses to analyze with Nansen"
+    )
 
 
 class AnalysisResponse(BaseModel):
@@ -126,6 +166,7 @@ class AnalysisResponse(BaseModel):
     green_flags: List[str]
     summary: str
     tweets_analyzed: int
+    tweet_count: int = 0  # Total tweets in DB for this user
     analyzed_at: str
     demo_mode: bool = False
     # Asshole Meter
@@ -136,6 +177,8 @@ class AnalysisResponse(BaseModel):
     bs_score: float = 0.0
     contradiction_count: int = 0
     contradictions: List[dict] = []
+    # Wallet/On-chain Analysis (Nansen)
+    wallet_analysis: Optional[dict] = None
 
 
 class StatsResponse(BaseModel):
@@ -143,6 +186,81 @@ class StatsResponse(BaseModel):
     total_analyses: int
     total_tweets: int
     average_score: float
+
+
+# Nansen API Models
+class NansenTokenScreenerRequest(BaseModel):
+    chains: List[str] = Field(
+        default=["ethereum", "solana", "base"],
+        description="Chains to filter (ethereum, solana, base, arbitrum, polygon, optimism, avalanche, bsc, fantom)"
+    )
+    timeframe: str = Field(
+        default="24h",
+        description="Time period for metrics (1h, 4h, 12h, 24h, 7d, 30d)"
+    )
+    only_smart_money: bool = Field(
+        default=True,
+        description="Filter for smart money activity only"
+    )
+    token_age_min: int = Field(default=1, ge=0, description="Minimum token age in days")
+    token_age_max: int = Field(default=365, ge=1, description="Maximum token age in days")
+    order_by: str = Field(
+        default="buy_volume",
+        description="Field to order by (buy_volume, sell_volume, net_flow, market_cap, volume, smart_money_holders, price_change)"
+    )
+    order_direction: str = Field(default="DESC", description="Sort direction (ASC or DESC)")
+    page: int = Field(default=1, ge=1, description="Page number")
+    per_page: int = Field(default=100, ge=1, le=100, description="Results per page (max 100)")
+
+
+class NansenTokenResponse(BaseModel):
+    symbol: str
+    name: str
+    chain: str
+    contract_address: str
+    price_usd: float
+    market_cap: Optional[float] = None
+    volume_24h: Optional[float] = None
+    buy_volume: Optional[float] = None
+    sell_volume: Optional[float] = None
+    net_flow: Optional[float] = None
+    smart_money_holders: int = 0
+    token_age_days: int = 0
+    price_change_24h: Optional[float] = None
+    logo_url: Optional[str] = None
+
+
+class NansenScreenerResponse(BaseModel):
+    success: bool
+    tokens: List[NansenTokenResponse] = []
+    total_count: int = 0
+    page: int = 1
+    per_page: int = 100
+    error: Optional[str] = None
+
+
+# Wallet Analysis Models
+class WalletAnalysisRequest(BaseModel):
+    username: str = Field(..., description="KOL username for context")
+    wallet_addresses: List[WalletAddress] = Field(..., description="Wallet addresses to analyze")
+
+
+class WalletAnalysisResponse(BaseModel):
+    success: bool
+    username: str
+    entity_matches: List[str] = []
+    wallets_analyzed: int = 0
+    total_realized_pnl: float = 0.0
+    total_unrealized_pnl: float = 0.0
+    is_smart_money: bool = False
+    smart_money_labels: List[str] = []
+    risk_score: float = 50.0
+    risk_flags: List[str] = []
+    trust_signals: List[str] = []
+    top_holdings: List[dict] = []
+    credibility_modifier: float = 0.0
+    analysis_summary: str = ""
+    error: Optional[str] = None
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -200,7 +318,8 @@ async def health_check():
         "components": {
             "engine": engine is not None,
             "crawler": TwitterCrawler is not None,
-            "database": db is not None
+            "database": db is not None,
+            "nansen": nansen_client is not None and nansen_client.is_configured
         },
         "import_errors": import_errors if import_errors else None,
         "paths": {
@@ -225,6 +344,261 @@ async def get_stats():
         except Exception as e:
             return StatsResponse(kols_analyzed=0, total_analyses=0, total_tweets=0, average_score=0)
     return StatsResponse(kols_analyzed=0, total_analyses=0, total_tweets=0, average_score=0)
+
+
+# =============================================================================
+# NANSEN API ENDPOINTS
+# =============================================================================
+
+@app.post("/nansen/token-screener", response_model=NansenScreenerResponse)
+async def nansen_token_screener(request: NansenTokenScreenerRequest):
+    """
+    Get tokens from Nansen token screener with smart money filters.
+
+    This endpoint provides access to Nansen's token screening data, allowing you to:
+    - Filter tokens by blockchain (Ethereum, Solana, Base, etc.)
+    - Filter by smart money activity
+    - Sort by various metrics (buy volume, sell volume, net flow, etc.)
+    - Paginate through results
+    """
+    if not nansen_client or not nansen_client.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="Nansen API not configured. Set NANSEN_API_KEY environment variable."
+        )
+
+    try:
+        result = await nansen_client.get_token_screener(
+            chains=request.chains,
+            timeframe=request.timeframe,
+            only_smart_money=request.only_smart_money,
+            token_age_min=request.token_age_min,
+            token_age_max=request.token_age_max,
+            order_by=request.order_by,
+            order_direction=request.order_direction,
+            page=request.page,
+            per_page=request.per_page
+        )
+
+        if not result.success:
+            return NansenScreenerResponse(
+                success=False,
+                error=result.error
+            )
+
+        return NansenScreenerResponse(
+            success=True,
+            tokens=[
+                NansenTokenResponse(
+                    symbol=t.symbol,
+                    name=t.name,
+                    chain=t.chain,
+                    contract_address=t.contract_address,
+                    price_usd=t.price_usd,
+                    market_cap=t.market_cap,
+                    volume_24h=t.volume_24h,
+                    buy_volume=t.buy_volume,
+                    sell_volume=t.sell_volume,
+                    net_flow=t.net_flow,
+                    smart_money_holders=t.smart_money_holders,
+                    token_age_days=t.token_age_days,
+                    price_change_24h=t.price_change_24h,
+                    logo_url=t.logo_url
+                )
+                for t in result.tokens
+            ],
+            total_count=result.total_count,
+            page=result.page,
+            per_page=result.per_page
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Nansen API request failed: {str(e)}"
+        )
+
+
+@app.get("/nansen/token-screener", response_model=NansenScreenerResponse)
+async def nansen_token_screener_get(
+    chains: str = "ethereum,solana,base",
+    timeframe: str = "24h",
+    only_smart_money: bool = True,
+    token_age_min: int = 1,
+    token_age_max: int = 365,
+    order_by: str = "buy_volume",
+    order_direction: str = "DESC",
+    page: int = 1,
+    per_page: int = 100
+):
+    """
+    Get tokens from Nansen token screener (GET method for convenience).
+
+    Pass chains as comma-separated string (e.g., "ethereum,solana,base")
+    """
+    chain_list = [c.strip() for c in chains.split(",") if c.strip()]
+
+    request = NansenTokenScreenerRequest(
+        chains=chain_list,
+        timeframe=timeframe,
+        only_smart_money=only_smart_money,
+        token_age_min=token_age_min,
+        token_age_max=token_age_max,
+        order_by=order_by,
+        order_direction=order_direction,
+        page=page,
+        per_page=per_page
+    )
+    return await nansen_token_screener(request)
+
+
+# =============================================================================
+# WALLET ANALYSIS ENDPOINTS
+# =============================================================================
+
+@app.post("/nansen/wallet-analysis", response_model=WalletAnalysisResponse)
+async def analyze_wallet(request: WalletAnalysisRequest):
+    """
+    Analyze wallet addresses associated with a KOL using Nansen data.
+
+    This endpoint:
+    - Searches for the KOL entity in Nansen's database
+    - Retrieves labels, PnL, and trading performance for provided wallets
+    - Identifies smart money status and risk flags
+    - Returns a credibility modifier to adjust KOL scores
+    """
+    if not nansen_client or not nansen_client.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="Nansen API not configured. Set NANSEN_API_KEY environment variable."
+        )
+
+    try:
+        # Convert wallet addresses to dict format
+        addresses = [
+            {"address": w.address, "chain": w.chain}
+            for w in request.wallet_addresses
+        ]
+
+        # Get wallet data from Nansen
+        nansen_data = await nansen_client.analyze_kol_wallets(
+            kol_name=request.username,
+            known_addresses=addresses
+        )
+
+        # Analyze with WalletAnalyzer if available
+        if WalletAnalyzer:
+            analyzer = WalletAnalyzer()
+            result = analyzer.analyze(request.username, nansen_data)
+
+            return WalletAnalysisResponse(
+                success=result.success,
+                username=request.username,
+                entity_matches=result.entity_matches,
+                wallets_analyzed=result.wallets_found,
+                total_realized_pnl=result.total_realized_pnl,
+                total_unrealized_pnl=result.total_unrealized_pnl,
+                is_smart_money=result.is_smart_money,
+                smart_money_labels=result.smart_money_labels,
+                risk_score=result.risk_score,
+                risk_flags=result.risk_flags,
+                trust_signals=result.trust_signals,
+                top_holdings=result.top_holdings,
+                credibility_modifier=result.credibility_modifier,
+                analysis_summary=result.analysis_summary,
+                error=result.error
+            )
+        else:
+            # Return raw Nansen data if WalletAnalyzer not available
+            return WalletAnalysisResponse(
+                success=nansen_data.get("success", False),
+                username=request.username,
+                entity_matches=nansen_data.get("entity_matches", []),
+                wallets_analyzed=len(nansen_data.get("wallets_analyzed", [])),
+                total_realized_pnl=nansen_data.get("total_realized_pnl", 0),
+                total_unrealized_pnl=nansen_data.get("total_unrealized_pnl", 0),
+                is_smart_money=nansen_data.get("is_smart_money", False),
+                smart_money_labels=nansen_data.get("smart_money_labels", []),
+                risk_flags=nansen_data.get("risk_flags", []),
+                top_holdings=nansen_data.get("top_holdings", []),
+                error=nansen_data.get("error")
+            )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Wallet analysis failed: {str(e)}"
+        )
+
+
+@app.get("/nansen/entity-search")
+async def search_entity(query: str):
+    """
+    Search for entity names in Nansen's database.
+
+    Use this to find if a KOL or fund is tracked by Nansen.
+    """
+    if not nansen_client or not nansen_client.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="Nansen API not configured"
+        )
+
+    try:
+        result = await nansen_client.search_entity(query)
+        return {
+            "success": result.success,
+            "query": query,
+            "entity_matches": result.entity_names,
+            "error": result.error
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/nansen/smart-money-trades")
+async def get_smart_money_trades(
+    chains: str = "ethereum,solana,base",
+    min_value_usd: float = 1000,
+    limit: int = 50
+):
+    """
+    Get recent smart money DEX trades.
+
+    Useful for seeing what smart traders are buying/selling.
+    """
+    if not nansen_client or not nansen_client.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="Nansen API not configured"
+        )
+
+    try:
+        chain_list = [c.strip() for c in chains.split(",") if c.strip()]
+        trades = await nansen_client.get_smart_money_trades(
+            chains=chain_list,
+            min_value_usd=min_value_usd,
+            limit=limit
+        )
+
+        return {
+            "success": True,
+            "trades": [
+                {
+                    "wallet_address": t.wallet_address,
+                    "wallet_label": t.wallet_label,
+                    "token_symbol": t.token_symbol,
+                    "chain": t.chain,
+                    "trade_type": t.trade_type,
+                    "amount_usd": t.amount_usd,
+                    "timestamp": t.timestamp
+                }
+                for t in trades
+            ],
+            "count": len(trades)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/analyze")
@@ -501,7 +875,15 @@ async def get_kol(username: str):
         except Exception as e:
             print(f"[/kol] Error checking tweet count: {e}")
 
-    return {"kol": kol, "analysis": analysis}
+    # Get actual tweet count from database
+    tweet_count = 0
+    try:
+        count_result = db.client.table("tweets").select("id", count="exact").eq("kol_id", kol["id"]).execute()
+        tweet_count = count_result.count or 0
+    except Exception as e:
+        print(f"[/kol] Error getting tweet count: {e}")
+
+    return {"kol": kol, "analysis": analysis, "tweet_count": tweet_count}
 
 
 @app.get("/kols")

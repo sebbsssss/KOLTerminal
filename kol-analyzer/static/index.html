@@ -1166,6 +1166,378 @@
                 padding: 20px;
             }
         }
+
+        /* Wallet Input Styles */
+        .wallet-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .wallet-toggle:hover {
+            color: var(--text-secondary);
+        }
+
+        .wallet-toggle-icon {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s;
+        }
+
+        .wallet-toggle.expanded .wallet-toggle-icon {
+            transform: rotate(90deg);
+        }
+
+        .wallet-section {
+            display: none;
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-cream);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .wallet-section.visible {
+            display: block;
+        }
+
+        .wallet-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .wallet-input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .wallet-input {
+            flex: 1;
+            padding: 10px 12px;
+            background: var(--bg-white);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+
+        .wallet-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .wallet-input::placeholder {
+            color: var(--text-light);
+        }
+
+        .chain-select {
+            padding: 10px 12px;
+            background: var(--bg-white);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            min-width: 100px;
+        }
+
+        .add-wallet-btn {
+            padding: 8px 12px;
+            background: transparent;
+            border: 1px dashed var(--border-dark);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .add-wallet-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .wallet-hint {
+            font-size: 11px;
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        /* On-chain Analysis Section */
+        .onchain-section {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .onchain-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7);
+        }
+
+        .onchain-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .onchain-title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .onchain-icon {
+            font-size: 18px;
+        }
+
+        .onchain-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #a5b4fc;
+            text-transform: lowercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nansen-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(99, 102, 241, 0.2);
+            border-radius: 4px;
+            font-size: 10px;
+            color: #818cf8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .smart-money-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.1));
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #34d399;
+        }
+
+        .smart-money-badge.not-verified {
+            background: rgba(107, 114, 128, 0.2);
+            border-color: rgba(107, 114, 128, 0.3);
+            color: #9ca3af;
+        }
+
+        .onchain-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .onchain-stat {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .onchain-stat-value {
+            font-size: 24px;
+            font-weight: 500;
+            font-family: 'EB Garamond', serif;
+            margin-bottom: 4px;
+        }
+
+        .onchain-stat-value.positive { color: #34d399; }
+        .onchain-stat-value.negative { color: #f87171; }
+        .onchain-stat-value.neutral { color: #e5e7eb; }
+
+        .onchain-stat-label {
+            font-size: 10px;
+            color: #9ca3af;
+            text-transform: lowercase;
+            letter-spacing: 0.3px;
+        }
+
+        .onchain-labels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .onchain-label {
+            padding: 4px 10px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 4px;
+            font-size: 11px;
+            color: #c4b5fd;
+        }
+
+        .onchain-label.risk {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .onchain-label.trust {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #6ee7b7;
+        }
+
+        .onchain-holdings {
+            margin-top: 16px;
+        }
+
+        .onchain-holdings-title {
+            font-size: 11px;
+            color: #9ca3af;
+            text-transform: lowercase;
+            margin-bottom: 10px;
+        }
+
+        .holding-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+            margin-bottom: 6px;
+        }
+
+        .holding-token {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #e5e7eb;
+            font-weight: 500;
+        }
+
+        .holding-value {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .holding-pnl {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .holding-pnl.positive { color: #34d399; }
+        .holding-pnl.negative { color: #f87171; }
+
+        .onchain-summary {
+            margin-top: 16px;
+            padding: 14px;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 6px;
+            font-size: 13px;
+            color: #c7d2fe;
+            line-height: 1.6;
+            font-family: 'EB Garamond', serif;
+            font-style: italic;
+        }
+
+        .onchain-modifier {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modifier-label {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .modifier-value {
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .modifier-value.positive { color: #34d399; }
+        .modifier-value.negative { color: #f87171; }
+        .modifier-value.neutral { color: #9ca3af; }
+
+        .no-wallet-data {
+            text-align: center;
+            padding: 24px;
+            color: #6b7280;
+        }
+
+        .no-wallet-data-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        .no-wallet-data-text {
+            font-size: 13px;
+        }
+
+        .entity-matches {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+        }
+
+        .entity-matches-label {
+            font-size: 10px;
+            color: #9ca3af;
+            margin-bottom: 6px;
+        }
+
+        .entity-match {
+            display: inline-block;
+            padding: 3px 8px;
+            background: rgba(139, 92, 246, 0.15);
+            border-radius: 3px;
+            font-size: 11px;
+            color: #a5b4fc;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        @media (max-width: 640px) {
+            .onchain-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1202,6 +1574,35 @@
                         >
                         <button class="search-btn" id="search-btn" onclick="searchKOL()">whatever go</button>
                     </div>
+
+                    <div class="wallet-toggle" id="wallet-toggle" onclick="toggleWalletSection()">
+                        <svg class="wallet-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                        <span>+ add wallet for on-chain analysis</span>
+                        <span class="nansen-badge" style="margin-left: auto; padding: 2px 6px; font-size: 9px;">powered by nansen</span>
+                    </div>
+
+                    <div class="wallet-section" id="wallet-section">
+                        <div class="wallet-label">
+                            <span>&#x1F4B0;</span>
+                            wallet addresses (optional)
+                        </div>
+                        <div id="wallet-inputs">
+                            <div class="wallet-input-row">
+                                <input type="text" class="wallet-input" id="wallet-0" placeholder="0x... or solana address" />
+                                <select class="chain-select" id="chain-0">
+                                    <option value="ethereum">Ethereum</option>
+                                    <option value="solana">Solana</option>
+                                    <option value="base">Base</option>
+                                    <option value="arbitrum">Arbitrum</option>
+                                    <option value="polygon">Polygon</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="add-wallet-btn" onclick="addWalletInput()">+ add another wallet</button>
+                        <div class="wallet-hint">we'll check nansen for smart money labels, pnl, and risk flags</div>
+                    </div>
                 </div>
             </div>
 
@@ -1223,6 +1624,47 @@
     <script>
         const API_BASE = '';
         let currentResults = {};
+        let walletInputCount = 1;
+
+        function toggleWalletSection() {
+            const toggle = document.getElementById('wallet-toggle');
+            const section = document.getElementById('wallet-section');
+            toggle.classList.toggle('expanded');
+            section.classList.toggle('visible');
+        }
+
+        function addWalletInput() {
+            const container = document.getElementById('wallet-inputs');
+            const newRow = document.createElement('div');
+            newRow.className = 'wallet-input-row';
+            newRow.innerHTML = `
+                <input type="text" class="wallet-input" id="wallet-${walletInputCount}" placeholder="0x... or solana address" />
+                <select class="chain-select" id="chain-${walletInputCount}">
+                    <option value="ethereum">Ethereum</option>
+                    <option value="solana">Solana</option>
+                    <option value="base">Base</option>
+                    <option value="arbitrum">Arbitrum</option>
+                    <option value="polygon">Polygon</option>
+                </select>
+            `;
+            container.appendChild(newRow);
+            walletInputCount++;
+        }
+
+        function getWalletAddresses() {
+            const wallets = [];
+            for (let i = 0; i < walletInputCount; i++) {
+                const addressInput = document.getElementById(`wallet-${i}`);
+                const chainSelect = document.getElementById(`chain-${i}`);
+                if (addressInput && chainSelect && addressInput.value.trim()) {
+                    wallets.push({
+                        address: addressInput.value.trim(),
+                        chain: chainSelect.value
+                    });
+                }
+            }
+            return wallets;
+        }
 
         const loadingMsgs = [
             "doing the thing. hold on",
@@ -1378,6 +1820,22 @@
             document.getElementById('results-section').classList.remove('visible');
             document.getElementById('results-container').innerHTML = '';
             document.getElementById('search-input').value = '';
+            // Reset wallet inputs
+            document.getElementById('wallet-inputs').innerHTML = `
+                <div class="wallet-input-row">
+                    <input type="text" class="wallet-input" id="wallet-0" placeholder="0x... or solana address" />
+                    <select class="chain-select" id="chain-0">
+                        <option value="ethereum">Ethereum</option>
+                        <option value="solana">Solana</option>
+                        <option value="base">Base</option>
+                        <option value="arbitrum">Arbitrum</option>
+                        <option value="polygon">Polygon</option>
+                    </select>
+                </div>
+            `;
+            walletInputCount = 1;
+            document.getElementById('wallet-section').classList.remove('visible');
+            document.getElementById('wallet-toggle').classList.remove('expanded');
             currentResults = {};
         }
 
@@ -1390,6 +1848,8 @@
                 showToast('u forgot the username', 'error');
                 return;
             }
+
+            const walletAddresses = getWalletAddresses();
 
             document.getElementById('search-hero').classList.add('has-results');
             document.getElementById('results-section').classList.add('visible');
@@ -1407,10 +1867,13 @@
             try {
                 let data = null;
 
-                try {
-                    const cacheRes = await fetch(`${API_BASE}/kol/${username}`);
-                    if (cacheRes.ok) data = await cacheRes.json();
-                } catch (e) {}
+                // Skip cache if wallet addresses provided
+                if (!walletAddresses.length) {
+                    try {
+                        const cacheRes = await fetch(`${API_BASE}/kol/${username}`);
+                        if (cacheRes.ok) data = await cacheRes.json();
+                    } catch (e) {}
+                }
 
                 if (!data) {
                     const res = await fetch(`${API_BASE}/analyze`, {
@@ -1424,6 +1887,26 @@
                     const analysisData = await res.json();
                     const kolRes = await fetch(`${API_BASE}/kol/${username}`);
                     data = kolRes.ok ? await kolRes.json() : { analysis: analysisData, kol: { username: analysisData.username } };
+                }
+
+                // Fetch wallet analysis if addresses provided
+                if (walletAddresses.length > 0) {
+                    try {
+                        const walletRes = await fetch(`${API_BASE}/nansen/wallet-analysis`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: username,
+                                wallet_addresses: walletAddresses
+                            })
+                        });
+
+                        if (walletRes.ok) {
+                            data.walletAnalysis = await walletRes.json();
+                        }
+                    } catch (e) {
+                        console.warn('Wallet analysis failed:', e);
+                    }
                 }
 
                 currentResults[username] = data;
@@ -1448,6 +1931,7 @@
         function renderResult(username, data, expanded = false) {
             const kol = data.kol || {};
             const analysis = data.analysis || {};
+            const walletAnalysis = data.walletAnalysis || null;
             const score = analysis.overall_score || 0;
             const grade = analysis.grade || '?';
             const initial = (kol.display_name || kol.username || '?')[0].toUpperCase();
@@ -1458,7 +1942,7 @@
                         <div class="result-avatar">${initial}</div>
                         <div class="result-info">
                             <div class="result-name">${kol.display_name || kol.username || username}</div>
-                            <div class="result-handle">@${kol.username || username} · ${formatNumber(kol.follower_count)} followers</div>
+                            <div class="result-handle">@${kol.username || username} · ${formatNumber(kol.follower_count)} followers${walletAnalysis?.is_smart_money ? ' · <span style="color: #34d399;">&#x2713; Smart Money</span>' : ''}</div>
                         </div>
                         <div class="result-meta">
                             <div class="score-display">
@@ -1473,7 +1957,7 @@
                     </div>
                     <div class="result-details">
                         <div class="details-content">
-                            ${renderDetails(username, kol, analysis)}
+                            ${renderDetails(username, kol, analysis, walletAnalysis)}
                         </div>
                     </div>
                 </div>
@@ -1487,7 +1971,107 @@
             }
         }
 
-        function renderDetails(username, kol, analysis) {
+        function formatPnL(value) {
+            if (!value || value === 0) return '$0';
+            const absVal = Math.abs(value);
+            if (absVal >= 1000000) return (value >= 0 ? '+' : '') + '$' + (value / 1000000).toFixed(1) + 'M';
+            if (absVal >= 1000) return (value >= 0 ? '+' : '') + '$' + (value / 1000).toFixed(1) + 'K';
+            return (value >= 0 ? '+' : '') + '$' + value.toFixed(0);
+        }
+
+        function renderOnchainSection(walletAnalysis) {
+            if (!walletAnalysis || !walletAnalysis.success) {
+                return '';
+            }
+
+            const totalPnL = (walletAnalysis.total_realized_pnl || 0) + (walletAnalysis.total_unrealized_pnl || 0);
+            const pnlClass = totalPnL > 0 ? 'positive' : totalPnL < 0 ? 'negative' : 'neutral';
+            const modifierClass = walletAnalysis.credibility_modifier > 0 ? 'positive' : walletAnalysis.credibility_modifier < 0 ? 'negative' : 'neutral';
+
+            return `
+                <div class="onchain-section">
+                    <div class="onchain-header">
+                        <div class="onchain-title-group">
+                            <span class="onchain-icon">&#x26D3;</span>
+                            <span class="onchain-title">on-chain vibes</span>
+                        </div>
+                        <div class="nansen-badge">
+                            <span>&#x1F50D;</span>
+                            nansen
+                        </div>
+                    </div>
+
+                    ${walletAnalysis.is_smart_money ? `
+                        <div style="margin-bottom: 16px;">
+                            <span class="smart-money-badge">
+                                <span>&#x2713;</span>
+                                Smart Money${walletAnalysis.smart_money_labels?.length ? ': ' + walletAnalysis.smart_money_labels.slice(0, 2).join(', ') : ''}
+                            </span>
+                        </div>
+                    ` : `
+                        <div style="margin-bottom: 16px;">
+                            <span class="smart-money-badge not-verified">
+                                <span>&#x2212;</span>
+                                Not Smart Money Verified
+                            </span>
+                        </div>
+                    `}
+
+                    <div class="onchain-grid">
+                        <div class="onchain-stat">
+                            <div class="onchain-stat-value ${pnlClass}">${formatPnL(totalPnL)}</div>
+                            <div class="onchain-stat-label">total pnl</div>
+                        </div>
+                        <div class="onchain-stat">
+                            <div class="onchain-stat-value neutral">${walletAnalysis.wallets_analyzed || 0}</div>
+                            <div class="onchain-stat-label">wallets checked</div>
+                        </div>
+                        <div class="onchain-stat">
+                            <div class="onchain-stat-value ${walletAnalysis.risk_score > 60 ? 'negative' : walletAnalysis.risk_score < 40 ? 'positive' : 'neutral'}">${(walletAnalysis.risk_score || 50).toFixed(0)}</div>
+                            <div class="onchain-stat-label">risk score</div>
+                        </div>
+                    </div>
+
+                    ${walletAnalysis.entity_matches?.length ? `
+                        <div class="entity-matches">
+                            <div class="entity-matches-label">known in nansen as:</div>
+                            ${walletAnalysis.entity_matches.map(e => `<span class="entity-match">${escapeHtml(e)}</span>`).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${(walletAnalysis.trust_signals?.length || walletAnalysis.risk_flags?.length) ? `
+                        <div class="onchain-labels">
+                            ${(walletAnalysis.trust_signals || []).map(s => `<span class="onchain-label trust">&#x2713; ${escapeHtml(s)}</span>`).join('')}
+                            ${(walletAnalysis.risk_flags || []).map(f => `<span class="onchain-label risk">&#x26A0; ${escapeHtml(f)}</span>`).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${walletAnalysis.top_holdings?.length ? `
+                        <div class="onchain-holdings">
+                            <div class="onchain-holdings-title">top holdings</div>
+                            ${walletAnalysis.top_holdings.slice(0, 5).map(h => `
+                                <div class="holding-item">
+                                    <span class="holding-token">${escapeHtml(h.token || 'Unknown')}</span>
+                                    <span class="holding-value">${formatPnL(h.holding_usd || 0).replace('+', '')}</span>
+                                    <span class="holding-pnl ${(h.pnl_realized || 0) >= 0 ? 'positive' : 'negative'}">${formatPnL(h.pnl_realized || 0)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${walletAnalysis.analysis_summary ? `
+                        <div class="onchain-summary">${escapeHtml(walletAnalysis.analysis_summary)}</div>
+                    ` : ''}
+
+                    <div class="onchain-modifier">
+                        <span class="modifier-label">credibility impact:</span>
+                        <span class="modifier-value ${modifierClass}">${walletAnalysis.credibility_modifier > 0 ? '+' : ''}${(walletAnalysis.credibility_modifier || 0).toFixed(0)} points</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDetails(username, kol, analysis, walletAnalysis = null) {
             const engagement = analysis.engagement_score || 0;
             const consistency = analysis.consistency_score || 0;
             const dissonance = analysis.dissonance_score || 0;
@@ -1719,6 +2303,8 @@
                         </div>
                     </div>
                 </div>
+
+                ${renderOnchainSection(walletAnalysis)}
             `;
         }
 
