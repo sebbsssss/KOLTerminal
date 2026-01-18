@@ -252,6 +252,7 @@ class WalletAnalysisResponse(BaseModel):
     wallets_analyzed: int = 0
     total_realized_pnl: float = 0.0
     total_unrealized_pnl: float = 0.0
+    win_rate: float = 0.0
     is_smart_money: bool = False
     smart_money_labels: List[str] = []
     risk_score: float = 50.0
@@ -498,6 +499,7 @@ async def analyze_wallet(request: WalletAnalysisRequest):
                 wallets_analyzed=result.wallets_found,
                 total_realized_pnl=result.total_realized_pnl,
                 total_unrealized_pnl=result.total_unrealized_pnl,
+                win_rate=result.win_rate,
                 is_smart_money=result.is_smart_money,
                 smart_money_labels=result.smart_money_labels,
                 risk_score=result.risk_score,
