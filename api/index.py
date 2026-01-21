@@ -1061,6 +1061,16 @@ async def analyze_kol_post(request: AnalyzeRequest):
                     if cached_tweet_count > analyzed_count * 1.2 and cached_tweet_count >= 20:
                         print(f"Skipping cached analysis: have {cached_tweet_count} tweets but only analyzed {analyzed_count}")
                     else:
+                        # Fetch Nansen wallet analysis for cached results too
+                        wallet_data = None
+                        if nansen_client:
+                            try:
+                                wallet_analysis = await nansen_client.analyze_kol_wallets(username)
+                                if wallet_analysis.get("success"):
+                                    wallet_data = wallet_analysis
+                            except Exception as e:
+                                print(f"Nansen wallet analysis failed: {e}")
+
                         # Return cached analysis
                         return AnalysisResponse(
                             username=username,
@@ -1087,7 +1097,8 @@ async def analyze_kol_post(request: AnalyzeRequest):
                             toxicity_emoji=cached.get('toxicity_emoji', '😐'),
                             bs_score=cached.get('bs_score', 0.0),
                             contradiction_count=cached.get('contradiction_count', 0),
-                            contradictions=cached.get('contradictions', [])
+                            contradictions=cached.get('contradictions', []),
+                            wallet_analysis=wallet_data
                         )
         except Exception as e:
             print(f"Cache lookup failed: {e}")
@@ -1153,6 +1164,16 @@ async def analyze_kol_post(request: AnalyzeRequest):
             except:
                 pass
 
+        # Fetch Nansen wallet analysis
+        wallet_data = None
+        if nansen_client:
+            try:
+                wallet_analysis = await nansen_client.analyze_kol_wallets(username)
+                if wallet_analysis.get("success"):
+                    wallet_data = wallet_analysis
+            except Exception as e:
+                print(f"Nansen wallet analysis failed: {e}")
+
         return AnalysisResponse(
             username=username,
             display_name=kol.get('display_name') if kol else None,
@@ -1178,7 +1199,8 @@ async def analyze_kol_post(request: AnalyzeRequest):
             toxicity_emoji=result.toxicity_emoji,
             bs_score=result.bs_score,
             contradiction_count=result.contradiction_count,
-            contradictions=result.contradictions
+            contradictions=result.contradictions,
+            wallet_analysis=wallet_data
         )
 
     # No cached tweets - fetch from Twitter API
@@ -1248,6 +1270,16 @@ async def analyze_kol_post(request: AnalyzeRequest):
             except:
                 pass
 
+        # Fetch Nansen wallet analysis
+        wallet_data = None
+        if nansen_client:
+            try:
+                wallet_analysis = await nansen_client.analyze_kol_wallets(username)
+                if wallet_analysis.get("success"):
+                    wallet_data = wallet_analysis
+            except Exception as e:
+                print(f"Nansen wallet analysis failed: {e}")
+
         return AnalysisResponse(
             username=username,
             display_name=profile.display_name,
@@ -1273,7 +1305,8 @@ async def analyze_kol_post(request: AnalyzeRequest):
             toxicity_emoji=result.toxicity_emoji,
             bs_score=result.bs_score,
             contradiction_count=result.contradiction_count,
-            contradictions=result.contradictions
+            contradictions=result.contradictions,
+            wallet_analysis=wallet_data
         )
 
     except HTTPException:
