@@ -2642,12 +2642,31 @@
             try {
                 // Use SSE streaming endpoint
                 const streamUrl = `${API_BASE}/analyze-stream?username=${encodeURIComponent(username)}&max_tweets=100`;
+                console.log('[SSE] Connecting to:', streamUrl);
                 currentEventSource = new EventSource(streamUrl);
 
                 let walletAnalysis = null;
                 let aiSuggestions = [];
+                let receivedFirstEvent = false;
+                let analysisComplete = false;
+
+                // Timeout: if no events received in 15 seconds, fall back
+                const sseTimeout = setTimeout(() => {
+                    if (!receivedFirstEvent && currentEventSource) {
+                        console.log('[SSE] Timeout - no events received, falling back');
+                        currentEventSource.close();
+                        currentEventSource = null;
+                        fallbackToRegularAnalysis(username, walletAddresses, btn);
+                    }
+                }, 15000);
+
+                currentEventSource.onopen = () => {
+                    console.log('[SSE] Connection opened');
+                };
 
                 currentEventSource.onmessage = async (event) => {
+                    receivedFirstEvent = true;
+                    clearTimeout(sseTimeout);
                     const eventData = JSON.parse(event.data);
                     const { status, message } = eventData;
 
@@ -2690,6 +2709,7 @@
                             break;
 
                         case 'complete':
+                            analysisComplete = true;
                             currentEventSource.close();
                             currentEventSource = null;
 
@@ -2732,14 +2752,18 @@
                 };
 
                 currentEventSource.onerror = (error) => {
-                    console.error('SSE error:', error);
+                    console.error('[SSE] Error:', error, 'readyState:', currentEventSource?.readyState);
+                    clearTimeout(sseTimeout);
                     if (currentEventSource) {
                         currentEventSource.close();
                         currentEventSource = null;
                     }
 
-                    // Fallback to regular endpoint
-                    fallbackToRegularAnalysis(username, walletAddresses, btn);
+                    // Only fallback if analysis hasn't completed successfully
+                    if (!analysisComplete) {
+                        console.log('[SSE] Falling back to regular mode');
+                        fallbackToRegularAnalysis(username, walletAddresses, btn);
+                    }
                 };
 
             } catch (e) {
@@ -2775,8 +2799,17 @@
                 if (!res.ok) throw new Error('nah');
 
                 const analysisData = await res.json();
-                const kolRes = await fetch(`${API_BASE}/kol/${username}`);
-                let data = kolRes.ok ? await kolRes.json() : { analysis: analysisData, kol: { username: analysisData.username } };
+
+                // Build data structure - use analysisData directly as it has tweet_count
+                let data = {
+                    kol: {
+                        username: analysisData.username,
+                        display_name: analysisData.display_name,
+                        profile_image_url: analysisData.profile_image_url,
+                        follower_count: analysisData.follower_count
+                    },
+                    analysis: analysisData  // This already has tweet_count from the API
+                };
 
                 // Try wallet analysis
                 try {
