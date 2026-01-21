@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 @dataclass
@@ -113,6 +113,49 @@ class NansenResponse:
     total_count: int = 0
     page: int = 1
     per_page: int = 100
+    success: bool = True
+    error: Optional[str] = None
+
+
+@dataclass
+class Transaction:
+    """Single transaction from Nansen address/transactions endpoint."""
+    tx_hash: str
+    block_timestamp: str
+    from_address: str
+    to_address: str
+    token_symbol: str
+    token_address: str
+    amount: float
+    amount_usd: float
+    method: str  # transfer, swap, buy, sell, etc.
+    counterparty_label: Optional[str] = None
+    counterparty_category: Optional[str] = None
+    chain: str = "ethereum"
+
+
+@dataclass
+class TransactionHistory:
+    """Transaction history response from Nansen."""
+    address: str
+    chain: str
+    transactions: List[Transaction] = field(default_factory=list)
+    total_count: int = 0
+    success: bool = True
+    error: Optional[str] = None
+
+
+@dataclass
+class PnLSummary:
+    """Aggregate PnL summary from Nansen pnl-summary endpoint."""
+    address: str
+    chain: str
+    total_realized_pnl: float = 0.0
+    realized_pnl_percent: float = 0.0
+    win_rate: float = 0.0
+    traded_token_count: int = 0
+    traded_times: int = 0
+    top_5_tokens: List[Dict[str, Any]] = field(default_factory=list)
     success: bool = True
     error: Optional[str] = None
 
@@ -893,3 +936,173 @@ class NansenClient:
             findings["success"] = False
             findings["error"] = str(e)
             return findings
+
+    # =========================================================================
+    # TRANSACTION & SUSPICIOUS ACTIVITY ENDPOINTS
+    # =========================================================================
+
+    async def get_address_transactions(
+        self,
+        address: str,
+        chain: str = "ethereum",
+        days: int = 90,
+        hide_spam: bool = True,
+        min_volume_usd: float = 100,
+        limit: int = 500
+    ) -> TransactionHistory:
+        """
+        Get transaction history for a wallet address.
+
+        Args:
+            address: Wallet address
+            chain: Blockchain
+            days: Number of days to look back
+            hide_spam: Filter out spam tokens
+            min_volume_usd: Minimum transaction value in USD
+            limit: Maximum transactions to retrieve
+
+        Returns:
+            TransactionHistory with transaction list
+        """
+        if not self.is_configured:
+            return TransactionHistory(
+                address=address,
+                chain=chain,
+                success=False,
+                error="API key not configured"
+            )
+
+        try:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+
+            session = await self._get_session()
+            response = await session.post(
+                f"{self.BASE_URL}/profiler/address/transactions",
+                json={
+                    "address": address,
+                    "chain": chain.lower(),
+                    "date": {
+                        "from": start_date.strftime("%Y-%m-%dT00:00:00Z"),
+                        "to": end_date.strftime("%Y-%m-%dT23:59:59Z")
+                    },
+                    "hide_spam_token": hide_spam,
+                    "filters": {
+                        "volume_usd": {"min": min_volume_usd}
+                    },
+                    "pagination": {"page": 1, "per_page": min(limit, 500)}
+                }
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                transactions = []
+                for item in data.get("data", []):
+                    # Parse transaction method/type
+                    method = item.get("method", item.get("source_type", "unknown"))
+                    if not method:
+                        method = "transfer"
+
+                    transactions.append(Transaction(
+                        tx_hash=item.get("transaction_hash", item.get("tx_hash", "")),
+                        block_timestamp=item.get("block_timestamp", ""),
+                        from_address=item.get("from_address", item.get("from", "")),
+                        to_address=item.get("to_address", item.get("to", "")),
+                        token_symbol=item.get("token_symbol", item.get("symbol", "")),
+                        token_address=item.get("token_address", item.get("contract_address", "")),
+                        amount=float(item.get("amount", item.get("token_amount", 0)) or 0),
+                        amount_usd=float(item.get("value_usd", item.get("amount_usd", 0)) or 0),
+                        method=method,
+                        counterparty_label=item.get("counterparty_label", item.get("counterparty_name")),
+                        counterparty_category=item.get("counterparty_category"),
+                        chain=chain
+                    ))
+
+                return TransactionHistory(
+                    address=address,
+                    chain=chain,
+                    transactions=transactions,
+                    total_count=data.get("total_count", len(transactions)),
+                    success=True
+                )
+
+            return TransactionHistory(
+                address=address,
+                chain=chain,
+                success=False,
+                error=f"API error: {response.status_code}"
+            )
+
+        except Exception as e:
+            return TransactionHistory(
+                address=address,
+                chain=chain,
+                success=False,
+                error=str(e)
+            )
+
+    async def get_pnl_summary(
+        self,
+        address: str,
+        chain: str = "ethereum"
+    ) -> PnLSummary:
+        """
+        Get aggregate PnL summary for a wallet.
+
+        Args:
+            address: Wallet address
+            chain: Blockchain
+
+        Returns:
+            PnLSummary with aggregate statistics
+        """
+        if not self.is_configured:
+            return PnLSummary(
+                address=address,
+                chain=chain,
+                success=False,
+                error="API key not configured"
+            )
+
+        try:
+            session = await self._get_session()
+            response = await session.post(
+                f"{self.BASE_URL}/profiler/address/pnl-summary",
+                json={
+                    "address": address,
+                    "chain": chain.lower()
+                }
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                result = data.get("data", data)
+
+                # Handle nested response structure
+                if isinstance(result, dict):
+                    return PnLSummary(
+                        address=address,
+                        chain=chain,
+                        total_realized_pnl=float(result.get("realized_pnl_usd", result.get("total_realized_pnl", 0)) or 0),
+                        realized_pnl_percent=float(result.get("realized_pnl_percent", 0) or 0),
+                        win_rate=float(result.get("win_rate", 0) or 0),
+                        traded_token_count=int(result.get("traded_token_count", 0) or 0),
+                        traded_times=int(result.get("traded_times", 0) or 0),
+                        top_5_tokens=result.get("top5_tokens", result.get("top_5_tokens", [])),
+                        success=True
+                    )
+
+            return PnLSummary(
+                address=address,
+                chain=chain,
+                success=False,
+                error=f"API error: {response.status_code}"
+            )
+
+        except Exception as e:
+            return PnLSummary(
+                address=address,
+                chain=chain,
+                success=False,
+                error=str(e)
+            )

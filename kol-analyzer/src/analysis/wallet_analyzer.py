@@ -41,6 +41,12 @@ class WalletAnalysisResult:
     credibility_modifier: float = 0.0  # -20 to +20
     analysis_summary: str = ""
 
+    # Suspicious activity analysis
+    suspicious_activity: Optional[Dict[str, Any]] = None
+    suspicious_risk_score: float = 0.0
+    suspicious_patterns_count: int = 0
+    suspicious_red_flags: List[str] = field(default_factory=list)
+
     success: bool = True
     error: Optional[str] = None
 
@@ -438,3 +444,76 @@ class WalletAnalyzer:
             "factors": factors,
             "summary": result.analysis_summary
         }
+
+    async def analyze_with_suspicious_activity(
+        self,
+        username: str,
+        nansen_data: Dict[str, Any],
+        transactions: List[Any] = None,
+        related_wallets: List[Any] = None,
+        nansen_client: Any = None
+    ) -> WalletAnalysisResult:
+        """
+        Enhanced analysis including suspicious activity detection.
+
+        Args:
+            username: KOL's username
+            nansen_data: Data from NansenClient.analyze_kol_wallets()
+            transactions: Pre-fetched transactions (optional)
+            related_wallets: Pre-fetched related wallets (optional)
+            nansen_client: NansenClient instance for fetching transactions
+
+        Returns:
+            WalletAnalysisResult with suspicious activity analysis
+        """
+        # Run standard analysis first
+        result = self.analyze(username, nansen_data)
+
+        # Run suspicious activity analysis
+        try:
+            from .suspicious_activity_analyzer import SuspiciousActivityAnalyzer
+
+            suspicious_analyzer = SuspiciousActivityAnalyzer(nansen_client)
+
+            # Get first wallet address for analysis
+            wallets = nansen_data.get("wallets_analyzed", [])
+            if wallets:
+                address = wallets[0].get("address", "")
+                chain = wallets[0].get("chain", "ethereum")
+
+                if address:
+                    suspicious_report = await suspicious_analyzer.analyze(
+                        address=address,
+                        chain=chain,
+                        transactions=transactions,
+                        related_wallets=related_wallets
+                    )
+
+                    if suspicious_report.success:
+                        result.suspicious_activity = suspicious_report.to_dict()
+                        result.suspicious_risk_score = suspicious_report.overall_risk_score
+                        result.suspicious_patterns_count = suspicious_report.pattern_count
+                        result.suspicious_red_flags = suspicious_report.red_flags
+
+                        # Adjust credibility modifier based on suspicious activity
+                        if suspicious_report.overall_risk_score > 70:
+                            result.credibility_modifier -= 15
+                            result.risk_flags.append("Critical suspicious activity detected")
+                        elif suspicious_report.overall_risk_score > 50:
+                            result.credibility_modifier -= 10
+                            result.risk_flags.append("High suspicious activity detected")
+                        elif suspicious_report.overall_risk_score > 25:
+                            result.credibility_modifier -= 5
+
+                        # Clamp credibility modifier
+                        result.credibility_modifier = max(-20, min(20, result.credibility_modifier))
+
+                        # Add suspicious red flags to overall risk flags
+                        result.risk_flags.extend(suspicious_report.red_flags[:3])
+                        result.risk_flags = list(set(result.risk_flags))
+
+        except Exception as e:
+            # Non-blocking - log but don't fail
+            print(f"  [Warning] Suspicious activity analysis failed: {e}")
+
+        return result

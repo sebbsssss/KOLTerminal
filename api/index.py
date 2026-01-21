@@ -21,11 +21,13 @@ os.environ["PYTHONPATH"] = f"{src_dir}:{kol_analyzer_dir}:{root_dir}"
 from typing import List, Optional
 from datetime import datetime
 import traceback
+import asyncio
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+import json
 
 # Create FastAPI app first (before potentially failing imports)
 app = FastAPI(
@@ -245,6 +247,27 @@ class WalletAnalysisRequest(BaseModel):
     wallet_addresses: List[WalletAddress] = Field(..., description="Wallet addresses to analyze")
 
 
+class SuspiciousPatternResponse(BaseModel):
+    """Individual suspicious pattern detected."""
+    pattern_type: str
+    risk_level: str
+    confidence: float
+    summary: str
+    evidence: dict = {}
+
+
+class SuspiciousActivityResponse(BaseModel):
+    """Suspicious activity analysis results."""
+    overall_risk_level: str = "low"
+    overall_risk_score: float = 0.0
+    patterns_detected: List[SuspiciousPatternResponse] = []
+    pattern_count: int = 0
+    suspicious_transaction_count: int = 0
+    suspicious_volume_usd: float = 0.0
+    red_flags: List[str] = []
+    warnings: List[str] = []
+
+
 class WalletAnalysisResponse(BaseModel):
     success: bool
     username: str
@@ -261,6 +284,8 @@ class WalletAnalysisResponse(BaseModel):
     top_holdings: List[dict] = []
     credibility_modifier: float = 0.0
     analysis_summary: str = ""
+    # Suspicious activity analysis
+    suspicious_activity: Optional[SuspiciousActivityResponse] = None
     error: Optional[str] = None
 
 
@@ -466,6 +491,7 @@ async def analyze_wallet(request: WalletAnalysisRequest):
     - Searches for the KOL entity in Nansen's database
     - Retrieves labels, PnL, and trading performance for provided wallets
     - Identifies smart money status and risk flags
+    - Detects suspicious activity patterns (mixer usage, wash trading, etc.)
     - Returns a credibility modifier to adjust KOL scores
     """
     if not nansen_client or not nansen_client.is_configured:
@@ -487,10 +513,60 @@ async def analyze_wallet(request: WalletAnalysisRequest):
             known_addresses=addresses
         )
 
+        # Fetch transactions for suspicious activity analysis
+        transactions = []
+        related_wallets = []
+        for addr in addresses[:3]:  # Limit to first 3 addresses for performance
+            try:
+                tx_history = await nansen_client.get_address_transactions(
+                    addr["address"], addr["chain"], days=90
+                )
+                if tx_history.success:
+                    transactions.extend(tx_history.transactions)
+
+                related = await nansen_client.get_related_wallets(
+                    addr["address"], addr["chain"]
+                )
+                related_wallets.extend(related)
+            except Exception as e:
+                print(f"  [Warning] Failed to fetch transactions for {addr['address']}: {e}")
+
         # Analyze with WalletAnalyzer if available
         if WalletAnalyzer:
             analyzer = WalletAnalyzer()
-            result = analyzer.analyze(request.username, nansen_data)
+
+            # Use async method with suspicious activity analysis
+            result = await analyzer.analyze_with_suspicious_activity(
+                request.username,
+                nansen_data,
+                transactions=transactions,
+                related_wallets=related_wallets,
+                nansen_client=nansen_client
+            )
+
+            # Build suspicious activity response
+            suspicious_response = None
+            if result.suspicious_activity:
+                sa = result.suspicious_activity
+                suspicious_response = SuspiciousActivityResponse(
+                    overall_risk_level=sa.get("overall_risk_level", "low"),
+                    overall_risk_score=sa.get("overall_risk_score", 0.0),
+                    patterns_detected=[
+                        SuspiciousPatternResponse(
+                            pattern_type=p.get("pattern_type", ""),
+                            risk_level=p.get("risk_level", "low"),
+                            confidence=p.get("confidence", 0.0),
+                            summary=p.get("summary", ""),
+                            evidence=p.get("evidence", {})
+                        )
+                        for p in sa.get("patterns_detected", [])
+                    ],
+                    pattern_count=sa.get("pattern_count", 0),
+                    suspicious_transaction_count=sa.get("suspicious_transaction_count", 0),
+                    suspicious_volume_usd=sa.get("suspicious_volume_usd", 0.0),
+                    red_flags=sa.get("red_flags", []),
+                    warnings=sa.get("warnings", [])
+                )
 
             return WalletAnalysisResponse(
                 success=result.success,
@@ -508,6 +584,7 @@ async def analyze_wallet(request: WalletAnalysisRequest):
                 top_holdings=result.top_holdings,
                 credibility_modifier=result.credibility_modifier,
                 analysis_summary=result.analysis_summary,
+                suspicious_activity=suspicious_response,
                 error=result.error
             )
         else:
@@ -610,6 +687,349 @@ async def analyze_kol_get(username: str, max_tweets: int = 200, force_refresh: b
     return await analyze_kol_post(request)
 
 
+def generate_ai_suggestions(wallet_analysis: dict) -> List[str]:
+    """Generate AI-powered suggestions based on wallet data."""
+    suggestions = []
+
+    if wallet_analysis.get("is_smart_money"):
+        suggestions.append("check their recent token picks - smart money often front-runs announcements")
+
+    total_pnl = wallet_analysis.get("total_realized_pnl", 0) + wallet_analysis.get("total_unrealized_pnl", 0)
+    if total_pnl > 100000:
+        suggestions.append(f"high PnL trader (${total_pnl:,.0f}) - worth tracking their new positions")
+    elif total_pnl < -50000:
+        suggestions.append(f"warning: significant losses (${total_pnl:,.0f}) - their calls might be exit liquidity")
+
+    labels = wallet_analysis.get("smart_money_labels", [])
+    if "Fund" in labels:
+        suggestions.append("identified as a fund - likely has insider access or significant resources")
+    if any("Specialist" in l for l in labels):
+        specialist_type = next((l for l in labels if "Specialist" in l), "Specialist")
+        suggestions.append(f"{specialist_type.lower()} - their calls in this niche carry more weight")
+    if any("Smart Trader" in l for l in labels):
+        suggestions.append("verified smart trader status - historically profitable on-chain")
+
+    risk_flags = wallet_analysis.get("risk_flags", [])
+    if any("exit" in f.lower() for f in risk_flags):
+        suggestions.append("WARNING: history of providing exit liquidity to retail")
+    if any("rug" in f.lower() for f in risk_flags):
+        suggestions.append("RED FLAG: associated with rug pulls - extreme caution advised")
+    if any("scam" in f.lower() for f in risk_flags):
+        suggestions.append("RED FLAG: scammer label detected")
+
+    # Check holdings
+    top_holdings = wallet_analysis.get("top_holdings", [])
+    if top_holdings:
+        profitable_holds = [h for h in top_holdings if h.get("roi_percent", 0) > 100]
+        if len(profitable_holds) >= 3:
+            suggestions.append(f"has {len(profitable_holds)} positions with 100%+ ROI - knows how to pick winners")
+
+    if not suggestions:
+        suggestions.append("standard wallet activity - nothing particularly noteworthy")
+
+    return suggestions
+
+
+@app.get("/analyze-stream")
+async def analyze_kol_stream(username: str, max_tweets: int = 100, force_refresh: bool = False):
+    """Stream analysis progress via Server-Sent Events."""
+
+    async def event_generator():
+        nonlocal username
+        username = username.lstrip('@').lower()
+
+        def send_event(status: str, message: str, data: dict = None):
+            event_data = {"status": status, "message": message}
+            if data:
+                event_data.update(data)
+            return f"data: {json.dumps(event_data)}\n\n"
+
+        yield send_event("starting", "waking up the hamsters...")
+
+        # Check if engine is available
+        if not engine:
+            yield send_event("error", f"analysis engine not available: {import_errors}")
+            return
+
+        # Step 1: Check cache
+        yield send_event("checking", "checking if we already stalked this person...")
+        await asyncio.sleep(0.3)
+
+        kol = None
+        cached_tweets = []
+
+        if db and not force_refresh:
+            try:
+                cached = db.get_latest_analysis(username)
+                kol = db.get_kol(username)
+                if cached and kol:
+                    cached_tweet_count = 0
+                    try:
+                        count_result = db.client.table("tweets").select("id", count="exact").eq("kol_id", kol["id"]).execute()
+                        cached_tweet_count = count_result.count or 0
+                    except:
+                        pass
+
+                    analyzed_count = cached.get('tweets_analyzed', 0)
+                    if not (cached_tweet_count > analyzed_count * 1.2 and cached_tweet_count >= 20):
+                        yield send_event("cache_hit", f"found cached analysis ({cached_tweet_count} tweets)")
+
+                        # Still do Nansen search for cached results
+                        wallet_data = None
+                        if nansen_client:
+                            yield send_event("wallet_search", "asking nansen if they know this person...")
+                            await asyncio.sleep(0.2)
+                            try:
+                                entity_result = await nansen_client.search_entity(username)
+                                if entity_result.success and entity_result.entity_names:
+                                    yield send_event("wallet_found", f"found {len(entity_result.entity_names)} associated entities", {
+                                        "entities": entity_result.entity_names[:5]
+                                    })
+                                    await asyncio.sleep(0.3)
+
+                                    wallet_analysis = await nansen_client.analyze_kol_wallets(username)
+                                    if wallet_analysis.get("success"):
+                                        wallet_data = wallet_analysis
+                                        suggestions = generate_ai_suggestions(wallet_analysis)
+                                        yield send_event("ai_thinking", "the AI is having thoughts about this...", {
+                                            "suggestions": suggestions
+                                        })
+                                else:
+                                    yield send_event("no_wallets", "this guy covered his tracks well. no wallets found.")
+                            except Exception as e:
+                                yield send_event("wallet_error", f"nansen lookup failed: {str(e)[:50]}")
+
+                        # Return cached result with wallet data
+                        result_data = {
+                            "username": username,
+                            "display_name": kol.get('display_name'),
+                            "profile_image_url": kol.get('profile_image_url'),
+                            "follower_count": kol.get('follower_count'),
+                            "overall_score": cached['overall_score'],
+                            "grade": cached['grade'],
+                            "confidence": cached['confidence'],
+                            "assessment": cached['assessment'],
+                            "engagement_score": cached['engagement_score'],
+                            "consistency_score": cached['consistency_score'],
+                            "dissonance_score": cached['dissonance_score'],
+                            "baiting_score": cached['baiting_score'],
+                            "red_flags": cached['red_flags'],
+                            "green_flags": cached['green_flags'],
+                            "summary": cached['summary'],
+                            "tweets_analyzed": cached_tweet_count,
+                            "tweet_count": cached_tweet_count,
+                            "analyzed_at": cached['created_at'],
+                            "asshole_score": cached.get('asshole_score', 50.0),
+                            "toxicity_level": cached.get('toxicity_level', 'mid'),
+                            "toxicity_emoji": cached.get('toxicity_emoji', ''),
+                            "bs_score": cached.get('bs_score', 0.0),
+                            "contradiction_count": cached.get('contradiction_count', 0),
+                            "contradictions": cached.get('contradictions', []),
+                            "wallet_analysis": wallet_data
+                        }
+                        yield send_event("complete", "done. here's the tea.", {"data": result_data})
+                        return
+            except Exception as e:
+                print(f"Cache lookup failed: {e}")
+
+        # Step 2: Check for cached tweets in DB
+        if db:
+            try:
+                if not kol:
+                    kol = db.get_kol(username)
+                if kol:
+                    cached_tweets = db.get_tweets(kol["id"], limit=max_tweets)
+                    if cached_tweets:
+                        yield send_event("tweets_found", f"found {len(cached_tweets)} cached tweets in db")
+            except Exception as e:
+                print(f"Failed to get cached tweets: {e}")
+
+        # Step 3: Fetch new tweets if needed
+        if not cached_tweets or len(cached_tweets) < 10:
+            yield send_event("fetching", f"downloading their personality ({max_tweets} tweets)...")
+
+            if not TwitterCrawler:
+                yield send_event("error", f"twitter crawler not available: {import_errors}")
+                return
+
+            rapidapi_key = os.environ.get("RAPIDAPI_KEY", "")
+            crawler = TwitterCrawler(rapidapi_key=rapidapi_key)
+
+            try:
+                await crawler.initialize()
+
+                profile = await crawler.get_user_profile(username)
+                if not profile:
+                    yield send_event("error", f"user @{username} not found on twitter")
+                    return
+
+                yield send_event("fetching", f"found @{username} ({profile.follower_count:,} followers). grabbing tweets...")
+
+                tweets = await crawler.get_user_tweets(username, max_tweets=min(max_tweets, 100))
+
+                yield send_event("fetched", f"got {len(tweets)} tweets. saving to db...")
+
+                # Cache to DB
+                if db:
+                    try:
+                        kol_id = db.upsert_kol(profile)
+                        db.save_tweets(kol_id, tweets)
+                        kol = db.get_kol(username)
+                    except Exception as e:
+                        print(f"Failed to cache: {e}")
+
+                cached_tweets = [
+                    {
+                        'id': t.id,
+                        'text': t.text,
+                        'timestamp': t.timestamp,
+                        'likes': t.likes,
+                        'retweets': t.retweets,
+                        'replies': t.replies,
+                        'has_media': t.has_media,
+                        'has_video': t.has_video,
+                        'is_quote_tweet': t.is_quote_tweet
+                    }
+                    for t in tweets
+                ]
+
+            except Exception as e:
+                yield send_event("error", f"failed to fetch tweets: {str(e)[:100]}")
+                return
+            finally:
+                await crawler.close()
+
+        # Convert cached tweets to analysis format
+        tweets_data = [
+            {
+                'id': t.get('tweet_id', t.get('id', '')),
+                'text': t.get('text', ''),
+                'timestamp': t.get('timestamp', ''),
+                'likes': t.get('likes', 0),
+                'retweets': t.get('retweets', 0),
+                'replies': t.get('replies', 0),
+                'has_media': t.get('has_media', False),
+                'has_video': t.get('has_video', False),
+                'is_quote_tweet': t.get('is_quote_tweet', False)
+            }
+            for t in cached_tweets
+        ]
+
+        # Step 4: Analyze
+        yield send_event("analyzing", "feeding tweets to the judgment machine...")
+        await asyncio.sleep(0.2)
+
+        # Get mentions if available
+        mentions = []
+        try:
+            if db and kol:
+                mentions_result = db.client.table("mentions").select("*").eq("kol_id", kol["id"]).limit(50).execute()
+                mentions = mentions_result.data if mentions_result.data else []
+        except:
+            pass
+
+        result = engine.analyze(
+            tweets_data,
+            kol.get('follower_count', 0) if kol else 0,
+            username,
+            mentions=mentions
+        )
+
+        # Save analysis
+        if db and kol:
+            try:
+                db.save_analysis(kol["id"], result.to_dict(), len(tweets_data))
+            except Exception as e:
+                print(f"Failed to save analysis: {e}")
+
+        # Step 5: Nansen wallet search
+        wallet_data = None
+        if nansen_client:
+            yield send_event("wallet_search", "asking nansen if they know this person...")
+            await asyncio.sleep(0.2)
+
+            try:
+                entity_result = await nansen_client.search_entity(username)
+
+                if entity_result.success and entity_result.entity_names:
+                    yield send_event("wallet_found", f"found {len(entity_result.entity_names)} associated entities", {
+                        "entities": entity_result.entity_names[:5]
+                    })
+                    await asyncio.sleep(0.3)
+
+                    # Full wallet analysis
+                    wallet_analysis = await nansen_client.analyze_kol_wallets(username)
+                    if wallet_analysis.get("success"):
+                        wallet_data = wallet_analysis
+
+                        # AI suggestions
+                        suggestions = generate_ai_suggestions(wallet_analysis)
+                        yield send_event("ai_thinking", "the AI is having thoughts about this...", {
+                            "suggestions": suggestions,
+                            "wallet_summary": {
+                                "is_smart_money": wallet_analysis.get("is_smart_money", False),
+                                "total_pnl": wallet_analysis.get("total_realized_pnl", 0) + wallet_analysis.get("total_unrealized_pnl", 0),
+                                "labels": wallet_analysis.get("smart_money_labels", [])[:5]
+                            }
+                        })
+                else:
+                    yield send_event("no_wallets", "this guy covered his tracks well. no wallets found.")
+            except Exception as e:
+                yield send_event("wallet_error", f"nansen lookup failed: {str(e)[:50]}")
+        else:
+            yield send_event("wallet_skip", "nansen not configured")
+
+        # Get total tweet count from DB
+        total_tweet_count = len(tweets_data)
+        if db and kol:
+            try:
+                count_result = db.client.table("tweets").select("id", count="exact").eq("kol_id", kol["id"]).execute()
+                total_tweet_count = count_result.count or len(tweets_data)
+            except:
+                pass
+
+        # Final result
+        result_data = {
+            "username": username,
+            "display_name": kol.get('display_name') if kol else None,
+            "profile_image_url": kol.get('profile_image_url') if kol else None,
+            "follower_count": kol.get('follower_count') if kol else None,
+            "overall_score": result.overall_score,
+            "grade": result.grade,
+            "confidence": result.confidence,
+            "assessment": result.assessment,
+            "engagement_score": result.engagement_score,
+            "consistency_score": result.consistency_score,
+            "dissonance_score": result.dissonance_score,
+            "baiting_score": result.baiting_score,
+            "red_flags": result.red_flags,
+            "green_flags": result.green_flags,
+            "summary": result.summary,
+            "tweets_analyzed": len(tweets_data),
+            "tweet_count": total_tweet_count,
+            "analyzed_at": datetime.now().isoformat(),
+            "asshole_score": result.asshole_score,
+            "toxicity_level": result.toxicity_level,
+            "toxicity_emoji": result.toxicity_emoji,
+            "bs_score": result.bs_score,
+            "contradiction_count": result.contradiction_count,
+            "contradictions": result.contradictions,
+            "wallet_analysis": wallet_data
+        }
+
+        yield send_event("complete", "done. here's the tea.", {"data": result_data})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_kol_post(request: AnalyzeRequest):
     """Analyze a KOL's credibility."""
@@ -658,7 +1078,8 @@ async def analyze_kol_post(request: AnalyzeRequest):
                             red_flags=cached['red_flags'],
                             green_flags=cached['green_flags'],
                             summary=cached['summary'],
-                            tweets_analyzed=cached['tweets_analyzed'],
+                            tweets_analyzed=cached_tweet_count,  # Use actual DB count
+                            tweet_count=cached_tweet_count,
                             analyzed_at=cached['created_at'],
                             demo_mode=False,
                             asshole_score=cached.get('asshole_score', 50.0),
@@ -723,6 +1144,15 @@ async def analyze_kol_post(request: AnalyzeRequest):
             except Exception as e:
                 print(f"Failed to save analysis: {e}")
 
+        # Get total tweet count from DB
+        total_tweet_count = len(tweets_data)
+        if db and kol:
+            try:
+                count_result = db.client.table("tweets").select("id", count="exact").eq("kol_id", kol["id"]).execute()
+                total_tweet_count = count_result.count or len(tweets_data)
+            except:
+                pass
+
         return AnalysisResponse(
             username=username,
             display_name=kol.get('display_name') if kol else None,
@@ -740,6 +1170,7 @@ async def analyze_kol_post(request: AnalyzeRequest):
             green_flags=result.green_flags,
             summary=result.summary,
             tweets_analyzed=len(tweets_data),
+            tweet_count=total_tweet_count,
             analyzed_at=datetime.now().isoformat(),
             demo_mode=False,
             asshole_score=result.asshole_score,
@@ -798,6 +1229,7 @@ async def analyze_kol_post(request: AnalyzeRequest):
         )
 
         # Try to cache
+        kol_id = None
         if db:
             try:
                 kol_id = db.upsert_kol(profile)
@@ -806,6 +1238,15 @@ async def analyze_kol_post(request: AnalyzeRequest):
                 db.save_analysis(kol_id, result.to_dict(), len(tweets))
             except Exception as e:
                 print(f"Failed to cache: {e}")
+
+        # Get total tweet count from DB
+        total_tweet_count = len(tweets)
+        if db and kol_id:
+            try:
+                count_result = db.client.table("tweets").select("id", count="exact").eq("kol_id", kol_id).execute()
+                total_tweet_count = count_result.count or len(tweets)
+            except:
+                pass
 
         return AnalysisResponse(
             username=username,
@@ -824,6 +1265,7 @@ async def analyze_kol_post(request: AnalyzeRequest):
             green_flags=result.green_flags,
             summary=result.summary,
             tweets_analyzed=len(tweets),
+            tweet_count=total_tweet_count,
             analyzed_at=datetime.now().isoformat(),
             demo_mode=crawler.demo_mode,
             asshole_score=result.asshole_score,

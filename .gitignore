@@ -47,3 +47,4 @@ logs/
 *.tmp
 *.temp
 .vercel
+.env*.local

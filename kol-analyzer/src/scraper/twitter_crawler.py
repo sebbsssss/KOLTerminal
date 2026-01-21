@@ -56,8 +56,8 @@ class TwitterCrawler:
     """
 
     # Rate limiting: track monthly usage
-    MONTHLY_LIMIT = 100
-    DEFAULT_TWEETS_PER_USER = 50  # Conservative to save quota
+    MONTHLY_LIMIT = 500
+    DEFAULT_TWEETS_PER_USER = 100  # Fetch 100 tweets per user
 
     def __init__(
         self,
@@ -223,8 +223,8 @@ class TwitterCrawler:
         """
         Get a user's tweets using Twitter241 API (limited to save quota).
         """
-        # Enforce conservative limit
-        max_tweets = min(max_tweets, self.max_tweets, 50)
+        # Enforce limit
+        max_tweets = min(max_tweets, self.max_tweets, 100)
 
         if self.demo_mode:
             return self._get_demo_tweets(username, max_tweets, progress_callback)
