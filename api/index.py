@@ -687,6 +687,144 @@ async def analyze_kol_get(username: str, max_tweets: int = 200, force_refresh: b
     return await analyze_kol_post(request)
 
 
+import re
+
+async def smart_wallet_discovery(username: str, display_name: str = None, tweets: List[dict] = None) -> dict:
+    """
+    AI-powered wallet discovery using multiple strategies.
+
+    Strategies:
+    1. Search Nansen by username
+    2. Search Nansen by display name
+    3. Extract wallet addresses from tweets (0x... and .eth)
+    4. Analyze any discovered addresses
+    """
+    if not nansen_client:
+        return {"success": False, "error": "Nansen client not configured", "search_strategies": []}
+
+    result = {
+        "success": False,
+        "entity_matches": [],
+        "wallets_analyzed": [],
+        "wallets_found_in_tweets": [],
+        "search_strategies": [],
+        "ai_analysis": [],
+        "total_realized_pnl": 0.0,
+        "total_unrealized_pnl": 0.0,
+        "is_smart_money": False,
+        "smart_money_labels": [],
+        "top_holdings": [],
+        "risk_flags": [],
+    }
+
+    # Strategy 1: Search by username
+    try:
+        result["search_strategies"].append(f"Searching Nansen for '{username}'...")
+        wallet_data = await nansen_client.analyze_kol_wallets(username)
+        if wallet_data.get("success") and (wallet_data.get("entity_matches") or wallet_data.get("wallets_analyzed")):
+            result.update(wallet_data)
+            result["success"] = True
+            result["ai_analysis"].append(f"Found entity match for @{username} in Nansen database")
+    except Exception as e:
+        result["search_strategies"].append(f"Username search failed: {str(e)[:50]}")
+
+    # Strategy 2: Search by display name if different from username
+    if not result["success"] and display_name and display_name.lower() != username.lower():
+        try:
+            result["search_strategies"].append(f"Trying display name '{display_name}'...")
+            wallet_data = await nansen_client.analyze_kol_wallets(display_name)
+            if wallet_data.get("success") and (wallet_data.get("entity_matches") or wallet_data.get("wallets_analyzed")):
+                result.update(wallet_data)
+                result["success"] = True
+                result["ai_analysis"].append(f"Found entity match for '{display_name}' in Nansen database")
+        except Exception as e:
+            result["search_strategies"].append(f"Display name search failed: {str(e)[:50]}")
+
+    # Strategy 3: Extract wallet addresses from tweets
+    wallet_addresses = []
+    ens_names = []
+
+    if tweets:
+        # Regex patterns for wallet addresses
+        eth_pattern = r'\b0x[a-fA-F0-9]{40}\b'
+        ens_pattern = r'\b[\w-]+\.eth\b'
+        sol_pattern = r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b'  # Solana addresses
+
+        for tweet in tweets[:50]:  # Check first 50 tweets
+            text = tweet.get('text', '')
+
+            # Find ETH addresses
+            eth_matches = re.findall(eth_pattern, text)
+            wallet_addresses.extend(eth_matches)
+
+            # Find ENS names
+            ens_matches = re.findall(ens_pattern, text.lower())
+            ens_names.extend(ens_matches)
+
+        # Deduplicate
+        wallet_addresses = list(set(wallet_addresses))[:5]  # Limit to 5
+        ens_names = list(set(ens_names))[:5]
+
+        if wallet_addresses:
+            result["wallets_found_in_tweets"] = wallet_addresses
+            result["search_strategies"].append(f"Found {len(wallet_addresses)} wallet address(es) in tweets")
+            result["ai_analysis"].append(f"Discovered {len(wallet_addresses)} wallet address(es) mentioned in their tweets")
+
+        if ens_names:
+            result["search_strategies"].append(f"Found {len(ens_names)} ENS name(s): {', '.join(ens_names[:3])}")
+            result["ai_analysis"].append(f"Uses ENS names: {', '.join(ens_names[:3])}")
+
+    # Strategy 4: Analyze discovered wallet addresses
+    if not result["success"] and wallet_addresses:
+        for addr in wallet_addresses[:3]:  # Analyze up to 3 addresses
+            try:
+                result["search_strategies"].append(f"Analyzing wallet {addr[:8]}...{addr[-4:]}")
+
+                # Get wallet profile from Nansen
+                profile = await nansen_client.get_wallet_profile(addr, "ethereum")
+                if profile.get("success"):
+                    result["success"] = True
+                    result["wallets_analyzed"].append(profile)
+
+                    # Aggregate data
+                    if profile.get("is_smart_money"):
+                        result["is_smart_money"] = True
+                        result["ai_analysis"].append(f"Wallet {addr[:8]}... is flagged as Smart Money")
+
+                    result["smart_money_labels"].extend(profile.get("smart_money_labels", []))
+                    result["total_realized_pnl"] += profile.get("realized_pnl", 0)
+                    result["total_unrealized_pnl"] += profile.get("unrealized_pnl", 0)
+                    result["top_holdings"].extend(profile.get("top_holdings", [])[:3])
+                    result["risk_flags"].extend(profile.get("risk_flags", []))
+
+            except Exception as e:
+                result["search_strategies"].append(f"Wallet analysis failed: {str(e)[:30]}")
+
+    # Deduplicate labels and flags
+    result["smart_money_labels"] = list(set(result["smart_money_labels"]))
+    result["risk_flags"] = list(set(result["risk_flags"]))
+
+    # Generate AI analysis summary
+    if not result["success"]:
+        result["ai_analysis"].append("No wallet data found through any search strategy")
+        result["ai_analysis"].append("This person either: (1) hasn't linked wallets publicly, (2) uses fresh wallets, or (3) is privacy-conscious")
+    else:
+        # Add performance-based insights
+        total_pnl = result["total_realized_pnl"] + result["total_unrealized_pnl"]
+        if total_pnl > 100000:
+            result["ai_analysis"].append(f"Strong on-chain performance: ${total_pnl:,.0f} total PnL")
+        elif total_pnl < -10000:
+            result["ai_analysis"].append(f"Caution: Negative PnL of ${total_pnl:,.0f}")
+
+        if result["is_smart_money"]:
+            result["ai_analysis"].append("Verified Smart Money status - their trades historically outperform")
+
+        if any("rug" in f.lower() or "scam" in f.lower() for f in result["risk_flags"]):
+            result["ai_analysis"].insert(0, "RED FLAG: Associated with scams or rug pulls")
+
+    return result
+
+
 def generate_ai_suggestions(wallet_analysis: dict) -> List[str]:
     """Generate AI-powered suggestions based on wallet data."""
     suggestions = []
@@ -1061,15 +1199,28 @@ async def analyze_kol_post(request: AnalyzeRequest):
                     if cached_tweet_count > analyzed_count * 1.2 and cached_tweet_count >= 20:
                         print(f"Skipping cached analysis: have {cached_tweet_count} tweets but only analyzed {analyzed_count}")
                     else:
-                        # Fetch Nansen wallet analysis for cached results too
+                        # Smart wallet discovery with multiple strategies
                         wallet_data = None
-                        if nansen_client:
-                            try:
-                                wallet_analysis = await nansen_client.analyze_kol_wallets(username)
-                                if wallet_analysis.get("success"):
-                                    wallet_data = wallet_analysis
-                            except Exception as e:
-                                print(f"Nansen wallet analysis failed: {e}")
+                        try:
+                            # Get cached tweets for wallet extraction
+                            cached_tweets_for_wallets = []
+                            if kol:
+                                try:
+                                    tweets_result = db.client.table("tweets").select("text").eq("kol_id", kol["id"]).limit(100).execute()
+                                    cached_tweets_for_wallets = [{"text": t.get("text", "")} for t in (tweets_result.data or [])]
+                                except:
+                                    pass
+
+                            wallet_discovery = await smart_wallet_discovery(
+                                username,
+                                display_name=kol.get('display_name') if kol else None,
+                                tweets=cached_tweets_for_wallets
+                            )
+                            # Always return wallet discovery results (even if no wallets found)
+                            wallet_data = wallet_discovery
+                        except Exception as e:
+                            print(f"Smart wallet discovery failed: {e}")
+                            wallet_data = {"success": False, "error": str(e), "search_strategies": [], "ai_analysis": ["Search failed - try again later"]}
 
                         # Return cached analysis
                         return AnalysisResponse(
@@ -1164,15 +1315,19 @@ async def analyze_kol_post(request: AnalyzeRequest):
             except:
                 pass
 
-        # Fetch Nansen wallet analysis
+        # Smart wallet discovery with multiple strategies
         wallet_data = None
-        if nansen_client:
-            try:
-                wallet_analysis = await nansen_client.analyze_kol_wallets(username)
-                if wallet_analysis.get("success"):
-                    wallet_data = wallet_analysis
-            except Exception as e:
-                print(f"Nansen wallet analysis failed: {e}")
+        try:
+            wallet_discovery = await smart_wallet_discovery(
+                username,
+                display_name=kol.get('display_name') if kol else None,
+                tweets=tweets_data
+            )
+            # Always return wallet discovery results (even if no wallets found)
+            wallet_data = wallet_discovery
+        except Exception as e:
+            print(f"Smart wallet discovery failed: {e}")
+            wallet_data = {"success": False, "error": str(e), "search_strategies": [], "ai_analysis": ["Search failed - try again later"]}
 
         return AnalysisResponse(
             username=username,
@@ -1270,15 +1425,19 @@ async def analyze_kol_post(request: AnalyzeRequest):
             except:
                 pass
 
-        # Fetch Nansen wallet analysis
+        # Smart wallet discovery with multiple strategies
         wallet_data = None
-        if nansen_client:
-            try:
-                wallet_analysis = await nansen_client.analyze_kol_wallets(username)
-                if wallet_analysis.get("success"):
-                    wallet_data = wallet_analysis
-            except Exception as e:
-                print(f"Nansen wallet analysis failed: {e}")
+        try:
+            wallet_discovery = await smart_wallet_discovery(
+                username,
+                display_name=profile.display_name,
+                tweets=tweets_data
+            )
+            # Always return wallet discovery results (even if no wallets found)
+            wallet_data = wallet_discovery
+        except Exception as e:
+            print(f"Smart wallet discovery failed: {e}")
+            wallet_data = {"success": False, "error": str(e), "search_strategies": [], "ai_analysis": ["Search failed - try again later"]}
 
         return AnalysisResponse(
             username=username,
