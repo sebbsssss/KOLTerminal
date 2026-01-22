@@ -691,19 +691,17 @@ import re
 
 async def smart_wallet_discovery(username: str, display_name: str = None, tweets: List[dict] = None) -> dict:
     """
-    AI-powered wallet discovery using multiple strategies with LLM analysis.
+    AI-powered wallet investigation using multiple strategies.
 
-    Strategies:
-    1. Search Nansen by username
-    2. Search Nansen by display name
-    3. Extract wallet addresses from tweets (0x... and .eth)
-    4. Analyze any discovered addresses
-    5. Use LLM to analyze suspicious activity patterns
-
-    Focus: Suspicious activity detection, NOT P&L display.
+    Works like a crypto investigator:
+    1. Search for known entity associations
+    2. Extract wallet addresses from tweets
+    3. Analyze wallet labels and flags
+    4. Use LLM to investigate suspicious patterns
+    5. Generate investigative findings (NO P&L/financial data)
     """
     if not nansen_client:
-        return {"success": False, "error": "Nansen client not configured", "search_strategies": [], "llm_analysis": []}
+        return {"success": False, "error": "Nansen client not configured", "search_strategies": [], "investigation_findings": []}
 
     result = {
         "success": False,
@@ -711,15 +709,18 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
         "wallets_analyzed": [],
         "wallets_found_in_tweets": [],
         "search_strategies": [],
-        "ai_analysis": [],
-        "llm_analysis": [],  # LLM-generated insights
-        "risk_assessment": "unknown",  # low/medium/high/critical
+        # Investigative findings (text-based)
+        "investigation_findings": [],
+        "risk_assessment": "unknown",
         "suspicious_indicators": [],
         "trust_indicators": [],
         "behavioral_patterns": [],
+        "connections_found": [],
+        # Labels and flags
         "is_smart_money": False,
         "smart_money_labels": [],
         "risk_flags": [],
+        "warning_labels": [],
     }
 
     # Strategy 1: Search by username
@@ -727,9 +728,13 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
         result["search_strategies"].append(f"Searching Nansen for '{username}'...")
         wallet_data = await nansen_client.analyze_kol_wallets(username)
         if wallet_data.get("success") and (wallet_data.get("entity_matches") or wallet_data.get("wallets_analyzed")):
-            result.update(wallet_data)
+            result["entity_matches"] = wallet_data.get("entity_matches", [])
+            result["wallets_analyzed"] = wallet_data.get("wallets_analyzed", [])
+            result["is_smart_money"] = wallet_data.get("is_smart_money", False)
+            result["smart_money_labels"] = wallet_data.get("smart_money_labels", [])
+            result["risk_flags"] = wallet_data.get("risk_flags", [])
             result["success"] = True
-            result["ai_analysis"].append(f"Found entity match for @{username} in Nansen database")
+            result["investigation_findings"].append(f"ENTITY FOUND: @{username} is a known entity in Nansen's database")
     except Exception as e:
         result["search_strategies"].append(f"Username search failed: {str(e)[:50]}")
 
@@ -739,9 +744,13 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
             result["search_strategies"].append(f"Trying display name '{display_name}'...")
             wallet_data = await nansen_client.analyze_kol_wallets(display_name)
             if wallet_data.get("success") and (wallet_data.get("entity_matches") or wallet_data.get("wallets_analyzed")):
-                result.update(wallet_data)
+                result["entity_matches"] = wallet_data.get("entity_matches", [])
+                result["wallets_analyzed"] = wallet_data.get("wallets_analyzed", [])
+                result["is_smart_money"] = wallet_data.get("is_smart_money", False)
+                result["smart_money_labels"] = wallet_data.get("smart_money_labels", [])
+                result["risk_flags"] = wallet_data.get("risk_flags", [])
                 result["success"] = True
-                result["ai_analysis"].append(f"Found entity match for '{display_name}' in Nansen database")
+                result["investigation_findings"].append(f"ENTITY FOUND: '{display_name}' matched in Nansen database")
         except Exception as e:
             result["search_strategies"].append(f"Display name search failed: {str(e)[:50]}")
 
@@ -750,90 +759,88 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
     ens_names = []
 
     if tweets:
-        # Regex patterns for wallet addresses
         eth_pattern = r'\b0x[a-fA-F0-9]{40}\b'
         ens_pattern = r'\b[\w-]+\.eth\b'
-        sol_pattern = r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b'  # Solana addresses
 
-        for tweet in tweets[:50]:  # Check first 50 tweets
+        for tweet in tweets[:50]:
             text = tweet.get('text', '')
-
-            # Find ETH addresses
             eth_matches = re.findall(eth_pattern, text)
             wallet_addresses.extend(eth_matches)
-
-            # Find ENS names
             ens_matches = re.findall(ens_pattern, text.lower())
             ens_names.extend(ens_matches)
 
-        # Deduplicate
-        wallet_addresses = list(set(wallet_addresses))[:5]  # Limit to 5
+        wallet_addresses = list(set(wallet_addresses))[:5]
         ens_names = list(set(ens_names))[:5]
 
         if wallet_addresses:
             result["wallets_found_in_tweets"] = wallet_addresses
             result["search_strategies"].append(f"Found {len(wallet_addresses)} wallet address(es) in tweets")
-            result["ai_analysis"].append(f"Discovered {len(wallet_addresses)} wallet address(es) mentioned in their tweets")
+            result["investigation_findings"].append(f"WALLET TRAIL: Found {len(wallet_addresses)} wallet address(es) publicly shared in their tweets")
 
         if ens_names:
             result["search_strategies"].append(f"Found {len(ens_names)} ENS name(s): {', '.join(ens_names[:3])}")
-            result["ai_analysis"].append(f"Uses ENS names: {', '.join(ens_names[:3])}")
+            result["investigation_findings"].append(f"ENS IDENTITY: Uses ENS names: {', '.join(ens_names[:3])}")
 
-    # Strategy 4: Analyze discovered wallet addresses
+    # Strategy 4: Analyze discovered wallet addresses for labels/flags
     if not result["success"] and wallet_addresses:
-        for addr in wallet_addresses[:3]:  # Analyze up to 3 addresses
+        for addr in wallet_addresses[:3]:
             try:
-                result["search_strategies"].append(f"Analyzing wallet {addr[:8]}...{addr[-4:]}")
-
-                # Get wallet profile from Nansen
+                result["search_strategies"].append(f"Investigating wallet {addr[:8]}...{addr[-4:]}")
                 profile = await nansen_client.get_wallet_profile(addr, "ethereum")
                 if profile.get("success"):
                     result["success"] = True
                     result["wallets_analyzed"].append(profile)
 
-                    # Aggregate data
+                    # Extract investigative data (no P&L)
                     if profile.get("is_smart_money"):
                         result["is_smart_money"] = True
-                        result["ai_analysis"].append(f"Wallet {addr[:8]}... is flagged as Smart Money")
+                        result["investigation_findings"].append(f"SMART MONEY: Wallet {addr[:8]}... has Smart Money designation")
 
-                    result["smart_money_labels"].extend(profile.get("smart_money_labels", []))
-                    result["total_realized_pnl"] += profile.get("realized_pnl", 0)
-                    result["total_unrealized_pnl"] += profile.get("unrealized_pnl", 0)
-                    result["top_holdings"].extend(profile.get("top_holdings", [])[:3])
+                    # Collect labels
+                    labels = profile.get("labels", [])
+                    for label in labels:
+                        label_name = label.get("label", "")
+                        if label_name:
+                            result["smart_money_labels"].append(label_name)
+                            if any(warn in label_name.lower() for warn in ["scam", "rug", "hack", "exploit", "phish"]):
+                                result["warning_labels"].append(label_name)
+
                     result["risk_flags"].extend(profile.get("risk_flags", []))
 
             except Exception as e:
                 result["search_strategies"].append(f"Wallet analysis failed: {str(e)[:30]}")
 
-    # Deduplicate labels and flags
+    # Deduplicate
     result["smart_money_labels"] = list(set(result["smart_money_labels"]))
     result["risk_flags"] = list(set(result["risk_flags"]))
+    result["warning_labels"] = list(set(result["warning_labels"]))
 
-    # Generate AI analysis summary
+    # Generate investigative summary
     if not result["success"]:
-        result["ai_analysis"].append("No wallet data found through any search strategy")
-        result["ai_analysis"].append("This person either: (1) hasn't linked wallets publicly, (2) uses fresh wallets, or (3) is privacy-conscious")
+        result["investigation_findings"].append("NO WALLET DATA: Could not find any associated wallets through Nansen")
+        result["investigation_findings"].append("POSSIBLE REASONS: (1) Uses fresh/burner wallets, (2) Privacy-conscious, (3) Not a known entity")
     else:
-        # Add performance-based insights
-        total_pnl = result["total_realized_pnl"] + result["total_unrealized_pnl"]
-        if total_pnl > 100000:
-            result["ai_analysis"].append(f"Strong on-chain performance: ${total_pnl:,.0f} total PnL")
-        elif total_pnl < -10000:
-            result["ai_analysis"].append(f"Caution: Negative PnL of ${total_pnl:,.0f}")
-
+        # Add label-based findings
         if result["is_smart_money"]:
-            result["ai_analysis"].append("Verified Smart Money status - their trades historically outperform")
+            result["investigation_findings"].append("VERIFIED SMART MONEY: This address has historically profitable trading patterns")
 
-        if any("rug" in f.lower() or "scam" in f.lower() for f in result["risk_flags"]):
-            result["ai_analysis"].insert(0, "RED FLAG: Associated with scams or rug pulls")
+        if result["warning_labels"]:
+            result["investigation_findings"].insert(0, f"RED FLAG LABELS: {', '.join(result['warning_labels'])}")
 
-    # Strategy 5: LLM Analysis for deeper insights (focus on suspicious activity)
+        if any("rug" in f.lower() for f in result["risk_flags"]):
+            result["investigation_findings"].insert(0, "CRITICAL: Associated with rug pull activity")
+        if any("scam" in f.lower() for f in result["risk_flags"]):
+            result["investigation_findings"].insert(0, "CRITICAL: Scammer label detected")
+        if any("mixer" in f.lower() or "tornado" in f.lower() for f in result["risk_flags"]):
+            result["investigation_findings"].insert(0, "SUSPICIOUS: Mixer/tumbler usage detected")
+
+    # Strategy 5: LLM Investigation for deeper analysis
     if WalletAnalyzer and (result["success"] or wallet_addresses):
         try:
-            result["search_strategies"].append("Running LLM analysis for suspicious activity patterns...")
+            result["search_strategies"].append("Running LLM investigation for suspicious patterns...")
             analyzer = WalletAnalyzer()
 
-            # Fetch transactions for suspicious activity analysis
+            # Fetch transactions for analysis
             transactions = []
             related_wallets_data = []
 
@@ -844,20 +851,24 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
                         transactions.extend(tx_history.transactions)
 
                     related = await nansen_client.get_related_wallets(addr, "ethereum")
-                    related_wallets_data.extend(related)
+                    if related:
+                        related_wallets_data.extend(related)
+                        result["connections_found"].extend([r.get("address", "")[:12] + "..." for r in related[:5]])
                 except Exception as e:
-                    print(f"  [Warning] Failed to fetch transactions for {addr[:10]}...: {e}")
+                    print(f"  [Warning] Failed to fetch data for {addr[:10]}...: {e}")
 
-            # Build nansen_data for LLM analysis
+            # Build context for LLM
             nansen_data_for_llm = {
                 "wallets_analyzed": result.get("wallets_analyzed", []),
                 "is_smart_money": result.get("is_smart_money", False),
                 "smart_money_labels": result.get("smart_money_labels", []),
                 "risk_flags": result.get("risk_flags", []),
                 "entity_matches": result.get("entity_matches", []),
+                "warning_labels": result.get("warning_labels", []),
+                "connections_found": len(related_wallets_data),
             }
 
-            # Run LLM analysis
+            # Run LLM investigation
             llm_result = await analyzer.analyze_with_llm(
                 username=username,
                 nansen_data=nansen_data_for_llm,
@@ -867,65 +878,69 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
             )
 
             if llm_result.get("success"):
-                result["llm_analysis"] = llm_result.get("llm_analysis", [])
                 result["risk_assessment"] = llm_result.get("risk_assessment", "unknown")
                 result["suspicious_indicators"] = llm_result.get("suspicious_indicators", [])
                 result["trust_indicators"] = llm_result.get("trust_indicators", [])
                 result["behavioral_patterns"] = llm_result.get("behavioral_patterns", [])
 
-                # Add LLM findings to ai_analysis
-                if llm_result.get("risk_summary"):
-                    result["ai_analysis"].insert(0, f"LLM Risk Assessment: {llm_result['risk_summary']}")
+                # Add LLM findings to investigation
+                llm_findings = llm_result.get("llm_analysis", [])
+                for finding in llm_findings:
+                    result["investigation_findings"].append(f"LLM INSIGHT: {finding}")
 
-                result["search_strategies"].append(f"LLM analysis complete: {result['risk_assessment']} risk")
+                if llm_result.get("risk_summary"):
+                    result["investigation_findings"].insert(0, f"RISK ASSESSMENT: {llm_result['risk_summary']}")
+
+                result["search_strategies"].append(f"LLM investigation complete: {result['risk_assessment']} risk")
             else:
-                result["search_strategies"].append(f"LLM analysis skipped: {llm_result.get('error', 'unknown error')}")
+                result["search_strategies"].append(f"LLM investigation skipped: {llm_result.get('error', 'unknown error')}")
 
         except Exception as e:
-            result["search_strategies"].append(f"LLM analysis failed: {str(e)[:50]}")
+            result["search_strategies"].append(f"LLM investigation failed: {str(e)[:50]}")
 
     return result
 
 
 def generate_ai_suggestions(wallet_analysis: dict) -> List[str]:
-    """Generate AI-powered suggestions based on wallet data."""
+    """Generate investigative suggestions based on wallet analysis (no P&L)."""
     suggestions = []
 
+    # Smart money insights
     if wallet_analysis.get("is_smart_money"):
-        suggestions.append("check their recent token picks - smart money often front-runs announcements")
-
-    total_pnl = wallet_analysis.get("total_realized_pnl", 0) + wallet_analysis.get("total_unrealized_pnl", 0)
-    if total_pnl > 100000:
-        suggestions.append(f"high PnL trader (${total_pnl:,.0f}) - worth tracking their new positions")
-    elif total_pnl < -50000:
-        suggestions.append(f"warning: significant losses (${total_pnl:,.0f}) - their calls might be exit liquidity")
+        suggestions.append("SMART MONEY VERIFIED - historically makes profitable trades, worth monitoring their activity")
 
     labels = wallet_analysis.get("smart_money_labels", [])
     if "Fund" in labels:
-        suggestions.append("identified as a fund - likely has insider access or significant resources")
+        suggestions.append("FUND IDENTIFIED - likely has insider access or significant resources")
     if any("Specialist" in l for l in labels):
         specialist_type = next((l for l in labels if "Specialist" in l), "Specialist")
-        suggestions.append(f"{specialist_type.lower()} - their calls in this niche carry more weight")
-    if any("Smart Trader" in l for l in labels):
-        suggestions.append("verified smart trader status - historically profitable on-chain")
+        suggestions.append(f"{specialist_type.upper()} - deep expertise in this sector")
 
+    # Risk flags (investigative focus)
     risk_flags = wallet_analysis.get("risk_flags", [])
     if any("exit" in f.lower() for f in risk_flags):
-        suggestions.append("WARNING: history of providing exit liquidity to retail")
+        suggestions.append("EXIT LIQUIDITY WARNING - history of dumping on retail followers")
     if any("rug" in f.lower() for f in risk_flags):
-        suggestions.append("RED FLAG: associated with rug pulls - extreme caution advised")
+        suggestions.append("RUG PULL ASSOCIATION - connected to projects that rugged")
     if any("scam" in f.lower() for f in risk_flags):
-        suggestions.append("RED FLAG: scammer label detected")
+        suggestions.append("SCAMMER FLAG - labeled as scammer in on-chain data")
+    if any("mixer" in f.lower() or "tornado" in f.lower() for f in risk_flags):
+        suggestions.append("MIXER USAGE - uses privacy tools to obscure fund origins")
+    if any("wash" in f.lower() for f in risk_flags):
+        suggestions.append("WASH TRADING - suspected artificial volume generation")
 
-    # Check holdings
-    top_holdings = wallet_analysis.get("top_holdings", [])
-    if top_holdings:
-        profitable_holds = [h for h in top_holdings if h.get("roi_percent", 0) > 100]
-        if len(profitable_holds) >= 3:
-            suggestions.append(f"has {len(profitable_holds)} positions with 100%+ ROI - knows how to pick winners")
+    # Behavioral patterns
+    patterns = wallet_analysis.get("behavioral_patterns", [])
+    for pattern in patterns[:3]:
+        suggestions.append(f"PATTERN: {pattern}")
+
+    # Suspicious indicators
+    suspicious = wallet_analysis.get("suspicious_indicators", [])
+    for indicator in suspicious[:3]:
+        suggestions.append(f"SUSPICIOUS: {indicator}")
 
     if not suggestions:
-        suggestions.append("standard wallet activity - nothing particularly noteworthy")
+        suggestions.append("NO FLAGS DETECTED - standard wallet activity, nothing suspicious found")
 
     return suggestions
 

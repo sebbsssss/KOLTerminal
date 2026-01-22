@@ -632,34 +632,47 @@ class WalletAnalyzer:
                 result["success"] = True
                 return result
 
-            # Build prompt
-            prompt = f"""You are a crypto forensics analyst examining wallet activity for @{username}.
+            # Build investigator-style prompt
+            prompt = f"""You are a crypto investigator examining @{username}. Your job is to dig deep and find anything suspicious.
 
-CONTEXT DATA:
+EVIDENCE COLLECTED:
 {chr(10).join(context_parts)}
 
-IMPORTANT: Focus ONLY on behavioral patterns and suspicious activity. Do NOT mention:
-- Specific P&L numbers or profits
-- Dollar amounts in holdings
-- Investment performance metrics
+YOUR INVESTIGATION MANDATE:
+- Act like an on-chain detective/forensic analyst
+- Look for patterns that suggest dishonest or manipulative behavior
+- NEVER mention dollar amounts, P&L, profits, or financial performance
+- Focus on BEHAVIOR and PATTERNS, not financial outcomes
+- Be direct and specific in your findings
 
-Analyze for:
-1. SUSPICIOUS INDICATORS - Any red flags suggesting dishonest behavior (mixer usage, wash trading, coordinated pumps, exit liquidity, fresh wallet funding patterns)
-2. TRUST INDICATORS - Positive signals (verified smart money status, consistent behavior, transparent trading)
-3. BEHAVIORAL PATTERNS - Trading style, risk appetite, potential conflicts of interest
+INVESTIGATE FOR:
+1. MIXER/TUMBLER USAGE - Are they hiding fund origins?
+2. WASH TRADING - Fake volume between related wallets?
+3. COORDINATED PUMPS - Buying in sync with other wallets before shilling?
+4. EXIT LIQUIDITY - Pattern of dumping after promoting?
+5. FRESH WALLET FUNDING - Receiving from newly created wallets?
+6. SYBIL BEHAVIOR - Multiple wallets controlled by same entity?
+7. RUG CONNECTIONS - Any links to known rugged projects?
+8. INSIDER TRADING - Trading before major announcements?
 
-Provide your analysis in this exact JSON format:
+Also note any TRUST SIGNALS:
+- Verified smart money status
+- Consistent long-term holding patterns
+- Transparent on-chain history
+- No association with scams
+
+Respond in this exact JSON format:
 {{
     "risk_level": "low|medium|high|critical",
-    "risk_summary": "1-2 sentence summary of overall risk",
-    "suspicious_indicators": ["list of concerning behaviors found"],
-    "trust_indicators": ["list of positive trust signals"],
-    "behavioral_patterns": ["observed trading/activity patterns"],
-    "key_findings": ["3-5 most important findings"],
-    "recommendation": "brief recommendation for following this KOL"
+    "risk_summary": "2-3 sentence investigator summary of what you found",
+    "suspicious_indicators": ["specific suspicious findings - be detailed"],
+    "trust_indicators": ["specific positive signals found"],
+    "behavioral_patterns": ["observed on-chain behavior patterns"],
+    "key_findings": ["your top 3-5 investigative findings as an on-chain detective"],
+    "recommendation": "your verdict - should people trust this KOL's crypto calls?"
 }}
 
-Only return valid JSON, no other text."""
+Return ONLY valid JSON, no other text."""
 
             # Call Vercel AI Gateway (using Claude or GPT model)
             response = client.chat.completions.create(
