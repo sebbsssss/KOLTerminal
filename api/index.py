@@ -689,6 +689,56 @@ async def analyze_kol_get(username: str, max_tweets: int = 200, force_refresh: b
 
 import re
 
+# Initialize X client for community sentiment scanning
+x_client = None
+try:
+    from x_client import XClient
+    import os
+    if os.environ.get("X_BEARER_TOKEN"):
+        x_client = XClient()
+        print("X API client initialized for community scanning")
+except Exception as e:
+    print(f"X client not available: {e}")
+
+
+async def scan_community_sentiment(username: str) -> dict:
+    """
+    Scan X/Twitter for community sentiment about a KOL.
+
+    Uses X API to find:
+    - What others are saying about them
+    - Warnings/accusations from the community
+    - Endorsements from trusted accounts
+    - High-profile mentions
+    """
+    if not x_client:
+        return {
+            "success": False,
+            "error": "X API not configured",
+            "findings": ["X API credentials not set - community sentiment scan unavailable"]
+        }
+
+    try:
+        sentiment = x_client.get_community_sentiment(username)
+        return {
+            "success": True,
+            "sentiment": sentiment.get("sentiment", "unknown"),
+            "findings": sentiment.get("findings", []),
+            "warning_count": sentiment.get("warning_count", 0),
+            "trust_count": sentiment.get("trust_count", 0),
+            "total_mentions": sentiment.get("total_mentions", 0),
+            "raw_warnings": sentiment.get("raw_data", {}).get("warnings", [])[:5],
+            "raw_endorsements": sentiment.get("raw_data", {}).get("endorsements", [])[:5],
+            "high_profile": sentiment.get("raw_data", {}).get("high_profile_mentions", [])[:5]
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "findings": [f"Error scanning community sentiment: {str(e)}"]
+        }
+
+
 async def smart_wallet_discovery(username: str, display_name: str = None, tweets: List[dict] = None) -> dict:
     """
     AI-powered wallet investigation using multiple strategies.
@@ -721,6 +771,10 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
         "smart_money_labels": [],
         "risk_flags": [],
         "warning_labels": [],
+        # Community sentiment (X scanning)
+        "community_sentiment": "unknown",
+        "community_warnings": [],
+        "community_endorsements": [],
     }
 
     # Strategy 1: Search by username
@@ -897,6 +951,42 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
 
         except Exception as e:
             result["search_strategies"].append(f"LLM investigation failed: {str(e)[:50]}")
+
+    # Strategy 6: X/Twitter Community Sentiment Scan
+    if x_client:
+        try:
+            result["search_strategies"].append("Scanning X for community sentiment...")
+            sentiment_result = await scan_community_sentiment(username)
+
+            if sentiment_result.get("success"):
+                result["community_sentiment"] = sentiment_result.get("sentiment", "unknown")
+
+                # Add community findings to investigation
+                for finding in sentiment_result.get("findings", []):
+                    result["investigation_findings"].append(f"X SCAN: {finding}")
+
+                # Store warnings and endorsements
+                result["community_warnings"] = sentiment_result.get("raw_warnings", [])
+                result["community_endorsements"] = sentiment_result.get("raw_endorsements", [])
+
+                # Update risk indicators based on community sentiment
+                warning_count = sentiment_result.get("warning_count", 0)
+                if warning_count > 5:
+                    result["suspicious_indicators"].append(f"Community flagged: {warning_count} warning mentions on X")
+                    result["risk_flags"].append("Multiple community warnings")
+                elif warning_count > 2:
+                    result["suspicious_indicators"].append(f"Some community concerns: {warning_count} warning mentions")
+
+                trust_count = sentiment_result.get("trust_count", 0)
+                if trust_count > 3:
+                    result["trust_indicators"].append(f"Community endorsed: {trust_count} positive mentions on X")
+
+                result["search_strategies"].append(f"X scan complete: {sentiment_result.get('total_mentions', 0)} mentions analyzed")
+            else:
+                result["search_strategies"].append(f"X scan skipped: {sentiment_result.get('error', 'not configured')}")
+
+        except Exception as e:
+            result["search_strategies"].append(f"X scan failed: {str(e)[:50]}")
 
     return result
 
