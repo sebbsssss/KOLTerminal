@@ -691,16 +691,19 @@ import re
 
 async def smart_wallet_discovery(username: str, display_name: str = None, tweets: List[dict] = None) -> dict:
     """
-    AI-powered wallet discovery using multiple strategies.
+    AI-powered wallet discovery using multiple strategies with LLM analysis.
 
     Strategies:
     1. Search Nansen by username
     2. Search Nansen by display name
     3. Extract wallet addresses from tweets (0x... and .eth)
     4. Analyze any discovered addresses
+    5. Use LLM to analyze suspicious activity patterns
+
+    Focus: Suspicious activity detection, NOT P&L display.
     """
     if not nansen_client:
-        return {"success": False, "error": "Nansen client not configured", "search_strategies": []}
+        return {"success": False, "error": "Nansen client not configured", "search_strategies": [], "llm_analysis": []}
 
     result = {
         "success": False,
@@ -709,11 +712,13 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
         "wallets_found_in_tweets": [],
         "search_strategies": [],
         "ai_analysis": [],
-        "total_realized_pnl": 0.0,
-        "total_unrealized_pnl": 0.0,
+        "llm_analysis": [],  # LLM-generated insights
+        "risk_assessment": "unknown",  # low/medium/high/critical
+        "suspicious_indicators": [],
+        "trust_indicators": [],
+        "behavioral_patterns": [],
         "is_smart_money": False,
         "smart_money_labels": [],
-        "top_holdings": [],
         "risk_flags": [],
     }
 
@@ -821,6 +826,63 @@ async def smart_wallet_discovery(username: str, display_name: str = None, tweets
 
         if any("rug" in f.lower() or "scam" in f.lower() for f in result["risk_flags"]):
             result["ai_analysis"].insert(0, "RED FLAG: Associated with scams or rug pulls")
+
+    # Strategy 5: LLM Analysis for deeper insights (focus on suspicious activity)
+    if WalletAnalyzer and (result["success"] or wallet_addresses):
+        try:
+            result["search_strategies"].append("Running LLM analysis for suspicious activity patterns...")
+            analyzer = WalletAnalyzer()
+
+            # Fetch transactions for suspicious activity analysis
+            transactions = []
+            related_wallets_data = []
+
+            for addr in (wallet_addresses or [])[:2]:
+                try:
+                    tx_history = await nansen_client.get_address_transactions(addr, "ethereum", days=90)
+                    if tx_history.success:
+                        transactions.extend(tx_history.transactions)
+
+                    related = await nansen_client.get_related_wallets(addr, "ethereum")
+                    related_wallets_data.extend(related)
+                except Exception as e:
+                    print(f"  [Warning] Failed to fetch transactions for {addr[:10]}...: {e}")
+
+            # Build nansen_data for LLM analysis
+            nansen_data_for_llm = {
+                "wallets_analyzed": result.get("wallets_analyzed", []),
+                "is_smart_money": result.get("is_smart_money", False),
+                "smart_money_labels": result.get("smart_money_labels", []),
+                "risk_flags": result.get("risk_flags", []),
+                "entity_matches": result.get("entity_matches", []),
+            }
+
+            # Run LLM analysis
+            llm_result = await analyzer.analyze_with_llm(
+                username=username,
+                nansen_data=nansen_data_for_llm,
+                transactions=transactions,
+                related_wallets=related_wallets_data,
+                tweets=tweets
+            )
+
+            if llm_result.get("success"):
+                result["llm_analysis"] = llm_result.get("llm_analysis", [])
+                result["risk_assessment"] = llm_result.get("risk_assessment", "unknown")
+                result["suspicious_indicators"] = llm_result.get("suspicious_indicators", [])
+                result["trust_indicators"] = llm_result.get("trust_indicators", [])
+                result["behavioral_patterns"] = llm_result.get("behavioral_patterns", [])
+
+                # Add LLM findings to ai_analysis
+                if llm_result.get("risk_summary"):
+                    result["ai_analysis"].insert(0, f"LLM Risk Assessment: {llm_result['risk_summary']}")
+
+                result["search_strategies"].append(f"LLM analysis complete: {result['risk_assessment']} risk")
+            else:
+                result["search_strategies"].append(f"LLM analysis skipped: {llm_result.get('error', 'unknown error')}")
+
+        except Exception as e:
+            result["search_strategies"].append(f"LLM analysis failed: {str(e)[:50]}")
 
     return result
 
@@ -1003,7 +1065,7 @@ async def analyze_kol_stream(username: str, max_tweets: int = 100, force_refresh
 
                 yield send_event("fetching", f"found @{username} ({profile.follower_count:,} followers). grabbing tweets...")
 
-                tweets = await crawler.get_user_tweets(username, max_tweets=min(max_tweets, 100))
+                tweets = await crawler.get_user_tweets(username, max_tweets=min(max_tweets, 300))
 
                 yield send_event("fetched", f"got {len(tweets)} tweets. saving to db...")
 
@@ -1377,7 +1439,7 @@ async def analyze_kol_post(request: AnalyzeRequest):
 
         tweets = await crawler.get_user_tweets(
             username,
-            max_tweets=min(request.max_tweets, 50)
+            max_tweets=min(request.max_tweets, 300)
         )
 
         # Fetch mentions (what others say about this KOL)

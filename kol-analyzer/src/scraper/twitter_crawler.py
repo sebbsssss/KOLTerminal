@@ -56,13 +56,13 @@ class TwitterCrawler:
     """
 
     # Rate limiting: track monthly usage
-    MONTHLY_LIMIT = 500
-    DEFAULT_TWEETS_PER_USER = 100  # Fetch 100 tweets per user
+    MONTHLY_LIMIT = 5000  # Increased for bulk operations
+    DEFAULT_TWEETS_PER_USER = 300  # Fetch up to 300 tweets per user
 
     def __init__(
         self,
         rapidapi_key: str = None,
-        max_tweets_per_user: int = 50,
+        max_tweets_per_user: int = 200,
         usage_file: str = "data/api_usage.json"
     ):
         # RapidAPI credentials - check env vars or use provided
@@ -216,15 +216,15 @@ class TwitterCrawler:
     async def get_user_tweets(
         self,
         username: str,
-        max_tweets: int = 50,
+        max_tweets: int = 200,
         include_replies: bool = False,
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> List[Tweet]:
         """
-        Get a user's tweets using Twitter241 API (limited to save quota).
+        Get a user's tweets using Twitter241 API.
         """
-        # Enforce limit
-        max_tweets = min(max_tweets, self.max_tweets, 100)
+        # Enforce limit - allow up to DEFAULT_TWEETS_PER_USER
+        max_tweets = min(max_tweets, self.max_tweets, self.DEFAULT_TWEETS_PER_USER)
 
         if self.demo_mode:
             return self._get_demo_tweets(username, max_tweets, progress_callback)

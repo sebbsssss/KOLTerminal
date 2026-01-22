@@ -517,3 +517,210 @@ class WalletAnalyzer:
             print(f"  [Warning] Suspicious activity analysis failed: {e}")
 
         return result
+
+    async def analyze_with_llm(
+        self,
+        username: str,
+        nansen_data: Dict[str, Any],
+        transactions: List[Any] = None,
+        related_wallets: List[Any] = None,
+        tweets: List[Dict] = None
+    ) -> Dict[str, Any]:
+        """
+        Use LLM (Gemini) to analyze wallet data and provide intelligent insights.
+
+        Focuses on:
+        - Suspicious activity patterns
+        - Behavioral red flags
+        - Trustworthiness signals
+        - NOT showing P&Ls or financial data
+
+        Args:
+            username: KOL's username
+            nansen_data: Data from Nansen
+            transactions: Transaction history
+            related_wallets: Related wallet connections
+            tweets: User's tweets for context
+
+        Returns:
+            Dict with LLM analysis results
+        """
+        import os
+
+        result = {
+            "success": False,
+            "llm_analysis": [],
+            "risk_assessment": "unknown",
+            "suspicious_indicators": [],
+            "trust_indicators": [],
+            "behavioral_patterns": [],
+            "recommendations": [],
+            "error": None
+        }
+
+        try:
+            import google.generativeai as genai
+
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                result["error"] = "Gemini API key not configured"
+                return result
+
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+
+            # Build context for LLM
+            context_parts = []
+
+            # Add wallet labels if available
+            wallets = nansen_data.get("wallets_analyzed", [])
+            if wallets:
+                labels = []
+                for w in wallets:
+                    for label in w.get("labels", []):
+                        labels.append(f"{label.get('label', '')}: {label.get('definition', '')}")
+                if labels:
+                    context_parts.append(f"Wallet Labels:\n" + "\n".join(labels[:10]))
+
+            # Add suspicious activity summary
+            suspicious = nansen_data.get("suspicious_activity", {})
+            if suspicious:
+                patterns = suspicious.get("patterns_detected", [])
+                if patterns:
+                    pattern_summaries = [p.get("summary", "") for p in patterns[:5]]
+                    context_parts.append(f"Suspicious Patterns Detected:\n" + "\n".join(pattern_summaries))
+
+                red_flags = suspicious.get("red_flags", [])
+                if red_flags:
+                    context_parts.append(f"Red Flags:\n" + "\n".join(red_flags[:5]))
+
+            # Add risk flags from standard analysis
+            risk_flags = nansen_data.get("risk_flags", [])
+            if risk_flags:
+                context_parts.append(f"Risk Indicators:\n" + "\n".join(risk_flags[:5]))
+
+            # Add smart money status
+            if nansen_data.get("is_smart_money"):
+                sm_labels = nansen_data.get("smart_money_labels", [])
+                context_parts.append(f"Smart Money Status: Yes ({', '.join(sm_labels[:3])})")
+
+            # Add transaction patterns if available
+            if transactions:
+                tx_summary = self._summarize_transactions(transactions[:50])
+                if tx_summary:
+                    context_parts.append(f"Transaction Patterns:\n{tx_summary}")
+
+            # Add related wallets if available
+            if related_wallets:
+                related_count = len(related_wallets)
+                context_parts.append(f"Connected Wallets: {related_count} related addresses found")
+
+            # Add tweet context if available
+            if tweets:
+                crypto_tweets = [t.get("text", "") for t in tweets[:20] if any(
+                    word in t.get("text", "").lower()
+                    for word in ["$", "buy", "sell", "moon", "pump", "token", "coin", "nfa", "dyor"]
+                )]
+                if crypto_tweets:
+                    context_parts.append(f"Recent Crypto Tweets:\n" + "\n".join(crypto_tweets[:5]))
+
+            if not context_parts:
+                result["llm_analysis"] = ["No wallet or transaction data available for analysis"]
+                result["success"] = True
+                return result
+
+            # Build prompt
+            prompt = f"""You are a crypto forensics analyst examining wallet activity for @{username}.
+
+CONTEXT DATA:
+{chr(10).join(context_parts)}
+
+IMPORTANT: Focus ONLY on behavioral patterns and suspicious activity. Do NOT mention:
+- Specific P&L numbers or profits
+- Dollar amounts in holdings
+- Investment performance metrics
+
+Analyze for:
+1. SUSPICIOUS INDICATORS - Any red flags suggesting dishonest behavior (mixer usage, wash trading, coordinated pumps, exit liquidity, fresh wallet funding patterns)
+2. TRUST INDICATORS - Positive signals (verified smart money status, consistent behavior, transparent trading)
+3. BEHAVIORAL PATTERNS - Trading style, risk appetite, potential conflicts of interest
+
+Provide your analysis in this exact JSON format:
+{{
+    "risk_level": "low|medium|high|critical",
+    "risk_summary": "1-2 sentence summary of overall risk",
+    "suspicious_indicators": ["list of concerning behaviors found"],
+    "trust_indicators": ["list of positive trust signals"],
+    "behavioral_patterns": ["observed trading/activity patterns"],
+    "key_findings": ["3-5 most important findings"],
+    "recommendation": "brief recommendation for following this KOL"
+}}
+
+Only return valid JSON, no other text."""
+
+            response = model.generate_content(prompt)
+
+            if response.text:
+                import json
+                try:
+                    # Try to parse JSON response
+                    analysis = json.loads(response.text.strip())
+                    result["success"] = True
+                    result["risk_assessment"] = analysis.get("risk_level", "unknown")
+                    result["llm_analysis"] = analysis.get("key_findings", [])
+                    result["suspicious_indicators"] = analysis.get("suspicious_indicators", [])
+                    result["trust_indicators"] = analysis.get("trust_indicators", [])
+                    result["behavioral_patterns"] = analysis.get("behavioral_patterns", [])
+                    result["recommendations"] = [analysis.get("recommendation", "")] if analysis.get("recommendation") else []
+                    result["risk_summary"] = analysis.get("risk_summary", "")
+                except json.JSONDecodeError:
+                    # If not valid JSON, extract key points as text
+                    result["success"] = True
+                    result["llm_analysis"] = [response.text.strip()[:500]]
+
+        except ImportError:
+            result["error"] = "google-generativeai package not installed"
+        except Exception as e:
+            result["error"] = str(e)
+
+        return result
+
+    def _summarize_transactions(self, transactions: List[Any]) -> str:
+        """Summarize transaction patterns without revealing specific amounts."""
+        if not transactions:
+            return ""
+
+        from collections import Counter
+
+        methods = Counter()
+        tokens = Counter()
+        counterparty_types = Counter()
+
+        for tx in transactions:
+            method = getattr(tx, "method", "") or "unknown"
+            methods[method] += 1
+
+            token = getattr(tx, "token_symbol", "") or "unknown"
+            tokens[token] += 1
+
+            cp_category = getattr(tx, "counterparty_category", "")
+            if cp_category:
+                counterparty_types[cp_category] += 1
+
+        summary_parts = []
+
+        # Top transaction types
+        top_methods = methods.most_common(3)
+        if top_methods:
+            summary_parts.append(f"Activity types: {', '.join(f'{m}({c})' for m, c in top_methods)}")
+
+        # Token diversity
+        unique_tokens = len(tokens)
+        summary_parts.append(f"Tokens traded: {unique_tokens} different tokens")
+
+        # Counterparty patterns
+        if counterparty_types:
+            top_cp = counterparty_types.most_common(3)
+            summary_parts.append(f"Counterparty types: {', '.join(f'{t}({c})' for t, c in top_cp)}")
+
+        return "\n".join(summary_parts)
