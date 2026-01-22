@@ -527,7 +527,7 @@ class WalletAnalyzer:
         tweets: List[Dict] = None
     ) -> Dict[str, Any]:
         """
-        Use LLM (Gemini) to analyze wallet data and provide intelligent insights.
+        Use LLM (Vercel AI Gateway) to analyze wallet data and provide intelligent insights.
 
         Focuses on:
         - Suspicious activity patterns
@@ -559,15 +559,18 @@ class WalletAnalyzer:
         }
 
         try:
-            import google.generativeai as genai
+            from openai import OpenAI
 
-            api_key = os.environ.get("GEMINI_API_KEY")
+            # Use Vercel AI Gateway
+            api_key = os.environ.get("VERCEL_AI_GATEWAY_API_KEY") or os.environ.get("OPENAI_API_KEY")
             if not api_key:
-                result["error"] = "Gemini API key not configured"
+                result["error"] = "Vercel AI Gateway API key not configured"
                 return result
 
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            client = OpenAI(
+                api_key=api_key,
+                base_url="https://ai-gateway.vercel.sh/v1"
+            )
 
             # Build context for LLM
             context_parts = []
@@ -658,13 +661,23 @@ Provide your analysis in this exact JSON format:
 
 Only return valid JSON, no other text."""
 
-            response = model.generate_content(prompt)
+            # Call Vercel AI Gateway (using Claude or GPT model)
+            response = client.chat.completions.create(
+                model="anthropic/claude-sonnet-4",  # or "openai/gpt-4o"
+                messages=[
+                    {"role": "system", "content": "You are a crypto forensics analyst. Always respond with valid JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.3
+            )
 
-            if response.text:
+            if response.choices and response.choices[0].message.content:
                 import json
+                response_text = response.choices[0].message.content.strip()
                 try:
                     # Try to parse JSON response
-                    analysis = json.loads(response.text.strip())
+                    analysis = json.loads(response_text)
                     result["success"] = True
                     result["risk_assessment"] = analysis.get("risk_level", "unknown")
                     result["llm_analysis"] = analysis.get("key_findings", [])
@@ -676,10 +689,10 @@ Only return valid JSON, no other text."""
                 except json.JSONDecodeError:
                     # If not valid JSON, extract key points as text
                     result["success"] = True
-                    result["llm_analysis"] = [response.text.strip()[:500]]
+                    result["llm_analysis"] = [response_text[:500]]
 
         except ImportError:
-            result["error"] = "google-generativeai package not installed"
+            result["error"] = "openai package not installed - run: pip install openai"
         except Exception as e:
             result["error"] = str(e)
 
